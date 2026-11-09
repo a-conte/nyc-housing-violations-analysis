@@ -39,6 +39,17 @@ def write_report(root, validation, summary, trend, winner, intervals):
     elasticity = [1 + b[1], 1 + b[1] + b[8], 1 + b[1] + b[8] + b[9]] if len(b) == 10 else [1 + b[1]]
     (root / "README.md").write_text(f"""# Calibration and temporal validation (Phase 5)
 
+## In short
+
+- Compared five model variations by training on earlier years and predicting 2023 and 2024,
+  then picked the one with the best calibration overall and within each building-size band.
+- The winner (`nb_size`) lets the violation rate change with building size, with breakpoints
+  at 10 and 50 apartments. It was refit on 2021–2024 and tested once on 2025.
+- In 2025, actual violations were 93% of predicted, and 98.4% of buildings fell inside the
+  model's 95% range.
+- It still misses building history: buildings with many past violations got 2.6 times more
+  than predicted, and buildings with none got far fewer.
+
 Run `OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 uv run python -m housing.model_validation`.
 Existing Phase 3 tables and Phase 4 fitting/scoring are reused. No source data or analytical
 tables are changed; no rankings, owner analysis or anomaly thresholds are produced.

@@ -26,7 +26,20 @@ def write_report(root, s, profiles, sensitivity):
         "peer_rate_p90",
         "unit_comparison",
     ]
+    lead_share = f"{100 * s['lead_bc'] / s['cohort_bc']:.2f}%"
+    persistent = s["leads_with_bc_all_prior_years"]
     (root / "README.md").write_text(f"""# Exploratory leads for review (Phase 6)
+
+## In short
+
+- Out of {s["cohort_buildings"]:,} buildings, {s["screen_eligible"]:,} passed the screening rules
+  and **{s["leads"]} were flagged for review**: the top 10 on each of three lists (total serious
+  violations, violations per apartment, and how far above the model's prediction).
+- The flagged buildings had {s["lead_bc"]:,} serious violations in 2025,
+  {lead_share} of the total. {persistent} of them also had serious
+  violations in every year from 2021 to 2024.
+- Most of the list holds up when the rules change; see the sensitivity table below.
+- These are leads for checking records, not findings that anyone broke the law.
 
 **These are leads for record review, not findings of illegal conduct or wrongdoing.**
 This is retrospective prioritization of recorded activity, not validated statistical anomaly

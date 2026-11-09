@@ -1,5 +1,16 @@
 # Extraction, validation and linkage audit (Phase 2)
 
+## In short
+
+- Downloaded 14 files from NYC Open Data (9,439,989 rows).
+  Each file's row count matched the source before and after download, and each file passed
+  its checksum before loading.
+- All 17 blocking integrity checks passed. 2 files failed verification at first
+  and were downloaded again.
+- Every month from 2021 to 2025 has both complaint and violation records.
+- When a record's IDs disagree about which building it belongs to, it is flagged for review
+  rather than silently re-matched.
+
 Generated from the local frozen extracts completed at **2026-11-05T17:44:45.707375+00:00**.
 Configured event window: **2021–2025**, using complaint receipt and violation inspection dates.
 Reference tables are current snapshots; historical ownership/occupancy is not reconstructed.

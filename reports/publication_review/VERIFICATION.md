@@ -1,5 +1,12 @@
 # Final documentation and publication review (Phase 7)
 
+## In short
+
+- Final checks before the repository went public: a clean setup, the tests, lint, link checks,
+  and a scan to confirm no data files or credentials were included.
+- Everything passed. The last section records the November 9 cleanup (renamed files and
+  folders, reformatted code), which changed no results.
+
 Completed November 9, 2026. This phase prepared the public repository; it did not extend the
 analysis, download data, refit models, commit, push or publish anything.
 
@@ -118,3 +125,7 @@ Readability changes only; no analytical logic, thresholds or outputs changed.
 - Phases 4 and 5 were not refit. Their recorded code hashes describe the files under their
   old names at commit `a9c9722` and earlier, as documented above.
 - The MIT License was added.
+- Plain-language "In short" summaries were added to the top of each stage report. Generated
+  reports were regenerated from saved outputs (data quality, cohort, baseline models, leads)
+  and differ only by the new section. The model-validation summary was added identically to
+  its renderer and saved report, because regenerating it would require refitting.

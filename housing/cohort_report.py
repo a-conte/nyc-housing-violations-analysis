@@ -91,6 +91,18 @@ def main() -> None:
     (REPORT / "README.md").write_text(
         """# Analytical cohort and SQL features (Phase 3)
 
+## In short
+
+- Started from all 381,275 buildings in HPD's inventory and applied seven rules in order,
+  keeping **145,832 apartment buildings** as the comparison group.
+- The rules keep current buildings with at least 3 apartments that are not public housing,
+  have clean IDs and a matching city property record, were built before 2021, have no
+  recorded alterations since, and have complete data for every month.
+- 75,106 of the kept buildings had no complaints or serious violations in five years. They
+  stay in, because they are part of "normal".
+- Apartment counts come from HPD. PLUTO's counts are kept only for sensitivity checks,
+  because PLUTO counts apartments per tax lot, and one lot can hold several buildings.
+
 Completed using the existing frozen inputs; no models or new source downloads.
 Reproduce with `python -m housing.cohort` after Phase 2. SQL lives in
 `sql/cohort/features.sql`. Rebuilds replace only the analytical schema tables inside a transaction.

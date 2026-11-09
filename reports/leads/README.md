@@ -1,5 +1,16 @@
 # Exploratory leads for review (Phase 6)
 
+## In short
+
+- Out of 145,832 buildings, 3,934 passed the screening rules
+  and **27 were flagged for review**: the top 10 on each of three lists (total serious
+  violations, violations per apartment, and how far above the model's prediction).
+- The flagged buildings had 11,328 serious violations in 2025,
+  1.98% of the total. 23 of them also had serious
+  violations in every year from 2021 to 2024.
+- Most of the list holds up when the rules change; see the sensitivity table below.
+- These are leads for checking records, not findings that anyone broke the law.
+
 **These are leads for record review, not findings of illegal conduct or wrongdoing.**
 This is retrospective prioritization of recorded activity, not validated statistical anomaly
 detection or evidence of investigative accuracy. No composite score is constructed.

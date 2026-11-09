@@ -1,5 +1,17 @@
 # Exploratory analysis and count baselines (Phase 4)
 
+## In short
+
+- Fit first-pass models on 2021–2024 to predict each building's 2025 serious violations
+  from its size, age, borough and year.
+- A Poisson model couldn't handle how uneven the counts are (training dispersion
+  33.37, where about 1 is expected), so a negative binomial model was added.
+- The negative binomial model got the share of zero-violation buildings about
+  right, but predicted far too many violations overall: actual 2025 violations were
+  62% of predicted.
+- Neither model was good enough to flag outliers. Fixing the size problem is the job of the
+  next stage, [model validation](../model_validation/README.md).
+
 Reproduce from the repository root with `uv sync --locked` and
 `OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 uv run python -m housing.baseline_models`.
 The runner reads existing DuckDB tables without changing them. No source downloads,

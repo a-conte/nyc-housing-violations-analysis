@@ -1,5 +1,12 @@
 # Leads completion review (Phase 6) — November 9, 2026
 
+## In short
+
+- A review of the leads stage. Automated tests recheck every number in the leads report
+  against the database and the individual violation records.
+- All headline results were confirmed: 27 leads, 11,328 serious violations in 2025, and the
+  sensitivity results.
+
 Phase 6 is complete. The existing selection implementation, analytical snapshot, queues,
 lead/profile/history tables, sensitivity outputs and figure were already generated when this
 review resumed. They were retained. Only report wording, report provenance, repository

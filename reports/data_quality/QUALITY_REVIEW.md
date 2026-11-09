@@ -1,5 +1,13 @@
 # Data-quality review (Phase 2) — November 5, 2026
 
+## In short
+
+- All 14 downloaded files were verified, and all 17 blocking database checks pass.
+- Two files were corrupted on the first download (one failed its checksum, the other had a
+  broken gzip stream). Both were downloaded again and the replacements checked out.
+- This review separates problems that were fixed from decisions left for the next stage,
+  such as which apartment count to use as each building's size.
+
 **Phase 2 is complete.** The verified snapshot is loaded into `data/housing.duckdb`.
 All **17 blocking database checks pass**. No Phase 3 modeling or analytical notebooks were
 started. The findings below distinguish resolved ingestion problems from decisions still

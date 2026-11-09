@@ -292,7 +292,33 @@ def write_reports(
         if checks
         else "No automated checks flagged records."
     )
+    blocking = connection.execute(
+        "SELECT count(*) FROM audit.checks WHERE severity = 'error'"
+    ).fetchone()[0]
+    repairs = len(run.get("repairs", []))
+    empty_months = sum(row[2] for row in monthly)
+    integrity = (
+        "Some blocking integrity checks FAILED, so the database was not published."
+        if errors
+        else f"All {blocking} blocking integrity checks passed."
+    )
+    coverage = (
+        f"Every month from {start} to {end} has both complaint and violation records."
+        if empty_months == 0
+        else f"{empty_months} source-months have no records; see the coverage table."
+    )
     body = f"""# Extraction, validation and linkage audit (Phase 2)
+
+## In short
+
+- Downloaded {len(manifests)} files from NYC Open Data ({sum(m["rows"] for m in manifests):,} rows).
+  Each file's row count matched the source before and after download, and each file passed
+  its checksum before loading.
+- {integrity} {repairs} {"file" if repairs == 1 else "files"} failed verification at first
+  and {"was" if repairs == 1 else "were"} downloaded again.
+- {coverage}
+- When a record's IDs disagree about which building it belongs to, it is flagged for review
+  rather than silently re-matched.
 
 Generated from the local frozen extracts completed at **{run["completed_at"]}**.
 Configured event window: **{start}–{end}**, using complaint receipt and violation inspection dates.

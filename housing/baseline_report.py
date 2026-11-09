@@ -23,7 +23,28 @@ def write_report(report):
     training = metrics[(metrics.model == "poisson") & (metrics.period == "training")].iloc[0]
     nb = metrics[(metrics.model == "nb2") & (metrics.period == "training")]
     dispersion = "Not fitted" if nb.empty else f"{nb.iloc[0].alpha:.3f}"
+    poisson_dispersion = f"{training.pearson_dispersion:.2f}"
+    nb_eval = evaluation[evaluation.model == "nb2"]
+    nb_summary = (
+        "Poisson was kept, because the counts were not overdispersed."
+        if nb_eval.empty
+        else (
+            "The negative binomial model got the share of zero-violation buildings about\n"
+            "  right, but predicted far too many violations overall: actual 2025 violations were\n"
+            f"  {nb_eval.iloc[0].aggregate_oe:.0%} of predicted."
+        )
+    )
     (report / "README.md").write_text(f"""# Exploratory analysis and count baselines (Phase 4)
+
+## In short
+
+- Fit first-pass models on 2021–2024 to predict each building's 2025 serious violations
+  from its size, age, borough and year.
+- A Poisson model couldn't handle how uneven the counts are (training dispersion
+  {poisson_dispersion}, where about 1 is expected), so a negative binomial model was added.
+- {nb_summary}
+- Neither model was good enough to flag outliers. Fixing the size problem is the job of the
+  next stage, [model validation](../model_validation/README.md).
 
 Reproduce from the repository root with `uv sync --locked` and
 `OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 uv run python -m housing.baseline_models`.
