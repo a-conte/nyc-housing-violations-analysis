@@ -128,9 +128,11 @@ checked by hand. This analysis does not show wrongdoing, ongoing defects or what
 
 - **Account for inspection effort.** Find a measure of how often each building was
   inspected, so the model can tell bad conditions apart from frequent inspections.
-- **Use each building's history.** The model underpredicts buildings with a long record of
-  violations. Adding past violations as a predictor, using training years only, should
-  improve the predictions.
+- **Add a second model that uses each building's history.** The current model leaves past
+  violations out on purpose, so that buildings with long records aren't treated as
+  "expected" to be bad. A second model that includes history, using training years only,
+  would separate buildings that are worse than their peers from buildings that are worse
+  than their own past.
 - **Look at owners, carefully.** HPD's public building registrations list owners and
   managing agents. Grouping buildings that share them could reveal patterns across a whole
   portfolio, but it would need careful record matching and manual checks before any name
