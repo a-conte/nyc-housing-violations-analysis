@@ -82,6 +82,7 @@ ORDER BY 1, 2
 
 
 def main() -> None:
+    """Export the cohort review tables and write reports/cohort/README.md."""
     with duckdb.connect(str(PROJECT / "data/housing.duckdb"), read_only=True) as connection:
         export_csv(connection, RULE_COVERAGE, REPORT / "rule_coverage.csv")
         cursor = connection.execute(RULE_COVERAGE)

@@ -14,7 +14,12 @@ from housing.download import now, save_json, sha256
 SQL = PROJECT / "sql/cohort/features.sql"
 
 
-def build(connection):
+def build(connection: duckdb.DuckDBPyConnection) -> None:
+    """Run the cohort SQL, then assert the results are well formed.
+
+    Checks: one row per building, at least 3 apartments, B/C equal to B plus C, every
+    building passed all eligibility rules, and every building-year has 12 covered months.
+    """
     connection.execute(SQL.read_text())
     assert (
         connection.execute(
@@ -42,7 +47,8 @@ def build(connection):
     )
 
 
-def main():
+def main() -> None:
+    """Rebuild the analytical tables in a transaction and write the Phase 3 report."""
     report = PROJECT / "reports/cohort"
     report.mkdir(parents=True, exist_ok=True)
     with duckdb.connect(str(PROJECT / "data/housing.duckdb")) as con:

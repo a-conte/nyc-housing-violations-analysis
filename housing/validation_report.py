@@ -1,13 +1,23 @@
 """Computed Phase 5 report; selection is frozen before final evaluation."""
 
 import json
+from pathlib import Path
 
 import pandas as pd
 
 from housing.database import markdown_table
 
 
-def write_report(root, validation, summary, trend, winner, intervals):
+def write_report(
+    root: Path,
+    validation: pd.DataFrame,
+    summary: pd.DataFrame,
+    trend: pd.DataFrame,
+    winner: str,
+    intervals: dict,
+) -> None:
+    """Write the Phase 5 README from the validation folds, final metrics, annual trend,
+    selected model name and bootstrap intervals."""
     means = (
         validation.groupby("model")[
             [

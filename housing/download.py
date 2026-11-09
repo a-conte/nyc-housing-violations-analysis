@@ -18,7 +18,7 @@ from pathlib import Path
 
 import requests
 
-from housing.sources import SOURCES, partitions
+from housing.sources import SOURCES, Source, partitions
 
 
 def now() -> str:
@@ -26,7 +26,7 @@ def now() -> str:
     return datetime.now(UTC).isoformat()
 
 
-def save_json(path: Path, value) -> None:
+def save_json(path: Path, value: object) -> None:
     """Write JSON atomically: write a temporary file, then rename it into place."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
@@ -69,7 +69,7 @@ def get(url: str, settings: dict, params: dict | None = None) -> requests.Respon
             time.sleep(min(2**attempt, 16))
 
 
-def check_schema(source, metadata: dict) -> None:
+def check_schema(source: Source, metadata: dict) -> None:
     """Fail if the live dataset no longer has every column this project requests."""
     fields = {column["fieldName"] for column in metadata["columns"]}
     missing = set(source.columns) - fields

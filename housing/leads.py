@@ -36,7 +36,22 @@ PLAN = {
 }
 
 
-def choose(frame, units="selected_units", allowed=None):
+def choose(
+    frame: pd.DataFrame, units: str = "selected_units", allowed: pd.Series | None = None
+) -> tuple[pd.DataFrame, pd.DataFrame, int]:
+    """Apply the screening gates, then take the top buildings on each indicator list.
+
+    A building must pass every minimum in PLAN (apartments, B/C count, expected count,
+    excess over expected, and observed/expected ratio). Survivors are ranked separately by
+    raw count, rate per 100 apartments and Pearson residual; the top `per_indicator_limit`
+    from each list are combined, with ties broken by numeric BuildingID.
+
+    `units` picks the apartment-count column (HPD or PLUTO) for the rate and size gate, and
+    `allowed` optionally restricts the population, which the sensitivity checks use.
+
+    Returns (selected buildings, one row per list membership with its reason and position,
+    number of buildings that passed the gates).
+    """
     d = frame.copy()
     d["rate"] = 100 * d.hazardous / d[units]
     ok = (
@@ -70,7 +85,14 @@ def choose(frame, units="selected_units", allowed=None):
     )
 
 
-def peer_summary(d, lead):
+def peer_summary(d: pd.DataFrame, lead: tuple) -> dict:
+    """Describe how one lead compares with similar buildings.
+
+    Peers are other cohort buildings in the same borough with half to twice the lead's
+    apartment count. With at least 30 peers, returns the peer median, 90th percentile and the
+    share of peers below the lead for B/C count, rate and complaints; otherwise those values
+    are None rather than widening the peer group. `lead` is one row from itertuples().
+    """
     peers = d[
         (d.borough_id == lead.borough_id)
         & d.selected_units.between(lead.selected_units * 0.5, lead.selected_units * 2)
@@ -90,7 +112,9 @@ def peer_summary(d, lead):
     return result
 
 
-def overlap(base, other):
+def overlap(base: pd.DataFrame, other: pd.DataFrame) -> dict:
+    """Compare two lead lists: how many were retained, removed and added, and their Jaccard
+    similarity (shared buildings divided by all buildings on either list)."""
     a = set(base.building_id)
     b = set(other.building_id)
     return {
@@ -103,7 +127,8 @@ def overlap(base, other):
     }
 
 
-def main():
+def main() -> None:
+    """Select leads from the frozen 2025 predictions and write the Phase 6 outputs."""
     report = PROJECT / "reports/leads"
     report.mkdir(parents=True, exist_ok=True)
     local = PROJECT / "data/leads"

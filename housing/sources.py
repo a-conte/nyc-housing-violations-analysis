@@ -13,11 +13,13 @@ class Source:
     date: str | None = None
 
     @property
-    def api(self):
+    def api(self) -> str:
+        """Socrata resource endpoint for row queries."""
         return f"{BASE_URL}/resource/{self.dataset_id}"
 
     @property
-    def metadata_url(self):
+    def metadata_url(self) -> str:
+        """Socrata metadata endpoint, used for schema checks."""
         return f"{BASE_URL}/api/views/{self.dataset_id}.json"
 
 
@@ -122,7 +124,7 @@ SOURCES = {
 }
 
 
-def partitions(source, start: int, end: int) -> list[tuple[str, str | None]]:
+def partitions(source: Source, start: int, end: int) -> list[tuple[str, str | None]]:
     """Split a source into (label, SoQL filter) pairs: one per year, plus undated rows."""
     if source.date is None:
         return [("all", None)]

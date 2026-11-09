@@ -125,6 +125,9 @@ Readability changes only; no analytical logic, thresholds or outputs changed.
 - Phases 4 and 5 were not refit. Their recorded code hashes describe the files under their
   old names at commit `a9c9722` and earlier, as documented above.
 - The MIT License was added.
+- Docstrings and type hints were added to every remaining Python function (lead selection,
+  model validation, cohort build and report writers). `python -m housing.leads` was rerun;
+  only its `provenance.json` changed.
 - Plain-language "In short" summaries were added to the top of each stage report. Generated
   reports were regenerated from saved outputs (data quality, cohort, baseline models, leads)
   and differ only by the new section. The model-validation summary was added identically to

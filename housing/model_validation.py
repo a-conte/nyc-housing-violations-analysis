@@ -37,7 +37,14 @@ PLAN = {
 }
 
 
-def matrix(d, name, last_year):
+def matrix(d: pd.DataFrame, name: str, last_year: int) -> np.ndarray:
+    """Build the predictor matrix for one candidate model.
+
+    Starts from the baseline design (size, age, year trend, borough). `nb_size_flat` holds
+    the year trend at `last_year` when predicting later years. Every model except the two
+    references adds hinge terms in log apartments at 10 and 50 units, so the violation rate
+    can change slope with building size.
+    """
     x = design(d).copy()
     if name == "nb_size_flat":
         x[:, 3] = np.minimum(d.year, last_year) - 2021
@@ -49,7 +56,12 @@ def matrix(d, name, last_year):
     return x
 
 
-def estimate(train, name):
+def estimate(train: pd.DataFrame, name: str) -> tuple[np.ndarray, float]:
+    """Fit one candidate model on training years only, returning (coefficients, alpha).
+
+    Refuses any data from 2025. For `poisson_size_nb_variance`, the mean comes from a
+    Poisson fit and the NB2 dispersion is then fitted by likelihood with that mean held fixed.
+    """
     if train.year.max() >= 2025:
         raise ValueError("2025 cannot enter estimation")
     x = matrix(train, name, int(train.year.max()))
@@ -69,7 +81,17 @@ def estimate(train, name):
     return b, a
 
 
-def evaluate(train, test, name, b, a):
+def evaluate(
+    train: pd.DataFrame, test: pd.DataFrame, name: str, b: np.ndarray, a: float
+) -> tuple[pd.DataFrame, dict, pd.DataFrame]:
+    """Score a fitted model on a later year and measure calibration by subgroup.
+
+    Groups are size band, size decile (edges from training buildings), borough, and prior
+    violation history (from training years only). The calibration loss used for model
+    selection is |log aggregate O/E| plus the mean |log O/E| across the three size bands.
+
+    Returns (per-building scores, summary metrics, observed/expected by group).
+    """
     out, m = score(test, b, a, design_matrix=matrix(test, name, int(train.year.max())))
     out["bbl"] = test.bbl.to_numpy()
     historical = train.groupby("building_id").hazardous.mean()
@@ -108,7 +130,9 @@ def evaluate(train, test, name, b, a):
     return out, m, groups
 
 
-def select(validation):
+def select(validation: pd.DataFrame) -> str:
+    """Pick the model with the lowest mean calibration loss across the 2023 and 2024 folds,
+    breaking ties by negative log likelihood. Rejects any other validation year."""
     if not validation.year.isin([2023, 2024]).all():
         raise ValueError("Selection accepts only pre-2025 validation folds")
     return (
@@ -119,7 +143,13 @@ def select(validation):
     )
 
 
-def bootstrap(out, previous):
+def bootstrap(out: pd.DataFrame, previous: pd.DataFrame) -> dict[str, list[float]]:
+    """Cluster bootstrap over tax lots for the aggregate O/E and the year-over-year change.
+
+    Resamples whole lots (BBLs) with replacement, keeping each lot's current and previous
+    year together, so buildings that share a lot stay correlated. Returns 95% percentile
+    intervals for both statistics.
+    """
     paired = out[["building_id", "bbl", "hazardous", "expected", "selected_units"]].merge(
         previous[["building_id", "hazardous"]],
         on="building_id",
@@ -145,7 +175,8 @@ def bootstrap(out, previous):
     )
 
 
-def main():
+def main() -> None:
+    """Run rolling validation, freeze the choice, then fit and evaluate the winner on 2025."""
     root = PROJECT / "reports/model_validation"
     root.mkdir(parents=True, exist_ok=True)
     local = PROJECT / "data/model_validation"

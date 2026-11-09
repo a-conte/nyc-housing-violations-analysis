@@ -1,9 +1,15 @@
 """Render the exploratory Phase 6 evidence, with no model training."""
 
+from pathlib import Path
+
+import pandas as pd
+
 from housing.database import markdown_table
 
 
-def write_report(root, s, profiles, sensitivity):
+def write_report(root: Path, s: dict, profiles: pd.DataFrame, sensitivity: pd.DataFrame) -> None:
+    """Write the Phase 6 README from the summary counts, illustrative profiles and
+    sensitivity table."""
     cols = [
         "building_id",
         "selected_units",

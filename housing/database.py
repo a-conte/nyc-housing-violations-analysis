@@ -5,6 +5,7 @@ import gzip
 import json
 import platform
 import uuid
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 import duckdb
@@ -142,10 +143,11 @@ def export_csv(connection: duckdb.DuckDBPyConnection, query: str, path: Path) ->
         writer.writerows(cursor.fetchall())
 
 
-def markdown_table(headers: list[str], rows) -> str:
+def markdown_table(headers: list[str], rows: Iterable[Sequence]) -> str:
     """Format rows as a Markdown table with thousands separators."""
 
-    def cell(value):
+    def cell(value: object) -> str:
+        """Format one value: dashes for missing, thousands separators, escaped pipes."""
         if value is None:
             return "—"
         if isinstance(value, float):

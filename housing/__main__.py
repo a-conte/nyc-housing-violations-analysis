@@ -5,7 +5,8 @@ import tomllib
 from pathlib import Path
 
 
-def main():
+def main() -> None:
+    """Parse arguments, validate the study years, then download and/or load."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["download", "load", "run"])
     parser.add_argument("--config", type=Path, default=Path("config.toml"))

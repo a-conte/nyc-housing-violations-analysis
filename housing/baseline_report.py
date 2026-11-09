@@ -1,11 +1,14 @@
 """Render the Phase 4 report from computed aggregate artifacts."""
 
+from pathlib import Path
+
 import pandas as pd
 
 from housing.database import markdown_table
 
 
-def write_report(report):
+def write_report(report: Path) -> None:
+    """Write the Phase 4 README from the metric and EDA CSVs already saved in `report`."""
     metrics = pd.read_csv(report / "model_metrics.csv")
     annual = pd.read_csv(report / "annual_eda.csv")
     sensitivity = pd.read_csv(report / "sensitivity.csv")

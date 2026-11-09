@@ -8,7 +8,8 @@ from urllib.parse import unquote, urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def main():
+def main() -> None:
+    """Check every local link and image in tracked Markdown files; exit 1 if any are broken."""
     paths = (
         subprocess.check_output(
             ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=ROOT
