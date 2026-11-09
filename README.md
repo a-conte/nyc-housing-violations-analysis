@@ -5,11 +5,13 @@
 **Which New York City apartment buildings have far more serious housing violations than
 similar buildings, and should get a closer look?**
 
-When a building has a dangerous problem, like no heat, lead paint or rodents, a city
-inspector can issue a violation. This project focuses on the two serious classes: Class B
-("hazardous") and Class C ("immediately hazardous"). It uses five years of public NYC records
-(2021–2025, about 9.4 million rows) to find buildings whose violation counts are unusually
-high compared with buildings of the same size, age and borough.
+When a city inspector finds a problem in an apartment building, NYC's housing agency (HPD)
+issues a violation. [HPD sorts violations into three classes](https://www.nyc.gov/site/hpd/services-and-information/clear-violations.page):
+Class A is non-hazardous, Class B is hazardous (such as leaks or holes in walls), and
+Class C is immediately hazardous (such as no heat or hot water, lead paint, or rodents).
+This project focuses on the two serious classes, B and C. It uses five years of public NYC
+records (2021–2025, about 9.4 million rows) to find buildings whose violation counts are
+unusually high compared with buildings of the same size, age and borough.
 
 ## The short answer
 
