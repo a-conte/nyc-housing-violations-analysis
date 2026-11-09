@@ -101,32 +101,38 @@ There is no secret combined score; every building's reason for selection is list
 
 ## Is the result reliable?
 
-**Aggregate fit improved, but the screening accuracy is unvalidated.** Across all buildings,
-actual 2025 violations were 93% of what the model predicted, and 98.4% of buildings fell
-inside its nominal 95% count intervals. These are useful overall diagnostics; they do not
-establish that the model reliably identifies unusually high counts or useful investigative
-leads. The intervals also condition on the fitted model and omit uncertainty in its
-parameters, record linkage and apartment counts.
+**The model gets the overall numbers right, but that doesn't prove the list is right.**
+Across all buildings, actual 2025 violations were 93% of what the model predicted, and 98.4%
+of buildings fell inside the model's 95% range. That shows the model captures the big
+picture. It doesn't show that the 27 flagged buildings are the ones that most deserve a
+closer look; only checking their records by hand could show that. The 95% ranges also
+understate the true uncertainty, because they assume the model's estimates, the record links
+and the apartment counts are all exactly right.
 
 **It struggles with history.** Buildings with a long record of violations got about 2.6 times
 more than predicted, and buildings with no history got far fewer. A building's past matters
 more than size and age alone can capture.
 
-**Sensitivity depends on which assumption changes.** Restricting the eligible population
-can change the list substantially. Changing the apartment-count source within the same
-comparable population has a smaller effect:
+**How much the list changes depends on what changes.** Removing buildings from the
+comparison group can change the list a lot. For the same buildings, switching where the
+apartment counts come from changes it very little:
 
-| Scenario | Comparison list | Leads retained | Total scenario leads |
+| What we changed | Compared with | Still flagged | Size of new list |
 | --- | --- | --- | --- |
-| Exclude ambiguous links, including shared active HPD tax lots | Original 27 leads | 23 of 27 | 27 |
-| Restrict to comparable one-building/one-lot properties, keeping HPD apartment counts | Original 27 leads | 21 of 27 | 26 |
-| Within that same comparable population, switch rate and apartment-size gates to PLUTO counts | 26 comparable-population HPD leads | 25 of 26 | 26 |
-| Restrict to comparable properties where HPD and PLUTO apartment counts agree | Original 27 leads | 16 of 27 | 23 |
+| Dropped buildings with uncertain ID links, including tax lots shared with other buildings | The original 27 | 23 of 27 | 27 |
+| Kept only buildings that are alone on their tax lot, still using HPD's apartment counts | The original 27 | 21 of 27 | 26 |
+| Same buildings as the row above, but using PLUTO's apartment counts for the rate and size rules | The 26 from the row above | 25 of 26 | 26 |
+| Kept only buildings where HPD and PLUTO agree on the apartment count | The original 27 | 16 of 27 | 23 |
 
-The **25-of-26** result is not retention of the original 27 leads. All scenarios keep the
-model's expected counts and residuals fixed; the PLUTO switch tests rate-based selection,
-not a refitted model. Queues are replenished after each restriction, so scenarios can add
-new leads. See the [full sensitivity analysis](reports/leads/README.md#selection-sensitivity-without-changing-the-model).
+When reading the table:
+
+- **"25 of 26" is compared with the row above it**, not with the original 27.
+- **The model's predictions are the same in every row.** Only the selection is rerun, so the
+  PLUTO row tests how the lists react to different apartment counts, not a different model.
+- **When buildings drop off, the next ones in line take their places,** so a scenario can add
+  buildings as well as remove them.
+
+See the [full sensitivity analysis](reports/leads/README.md#selection-sensitivity-without-changing-the-model).
 
 ## What this can't tell you
 
