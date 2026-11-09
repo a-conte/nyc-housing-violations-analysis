@@ -8,3 +8,23 @@ data/
 *.duckdb
 *.duckdb.wal
 
+
+# Local credentials and machine configuration
+.env
+.env.*
+!.env.example
+.aws/
+*.pem
+*.key
+
+# Build, editor and temporary artifacts
+build/
+dist/
+*.egg-info/
+.coverage
+htmlcov/
+*.tmp
+*.log
+*.swp
+*.swo
+*~

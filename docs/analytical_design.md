@@ -1,5 +1,25 @@
 # Investigating Unusual Patterns in NYC Housing Complaints and Violations
 
+## Final scope note — Phase 7
+
+This document preserves the original proposal and the decisions known at each phase, rather
+than serving as a checklist of implemented features. The [root README](../README.md) describes
+the completed project; [Phase 6](../reports/phase6/README.md) supplies the final investigative
+report. Phases 2–7 are complete. Earlier statements such as “no rankings” refer to those earlier
+phase outcomes, not the final project.
+
+The implemented analysis uses four sources, building-level B/C outcomes, Poisson/NB2
+comparisons, pre-2025 rolling selection of a size-adjusted NB2 comparator, and separate raw,
+rate and residual review queues. No Isolation Forest, owner analysis, separate complaint
+model, notebook deliverable, formal tail testing or false-discovery procedure was implemented.
+Those proposals below were outside the final authorized scope. Operational lead-selection
+rules were documented after the 2025 evaluation; they are not preregistered thresholds.
+Historical persistence is descriptive context, not an independent validation outcome.
+Phase 3 adopted HPD capacity with explicit PLUTO sensitivity, superseding Phase 2's provisional
+agreement-only denominator. Historical exposure and alternative event-date sensitivity remain
+limitations. The [reproduction guide](reproduction.md) identifies what can be rerun from Git
+alone and what requires retained local data.
+
 ## Research and analytical design
 
 **Status:** Approved with portfolio-scope adjustments; Phase 2 completed November 5, 2026.
