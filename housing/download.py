@@ -21,23 +21,30 @@ import requests
 from housing.sources import SOURCES, partitions
 
 
-def now():
+def now() -> str:
+    """Current UTC time as an ISO 8601 string."""
     return datetime.now(UTC).isoformat()
 
 
-def save_json(path, value):
+def save_json(path: Path, value) -> None:
+    """Write JSON atomically: write a temporary file, then rename it into place."""
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_text(json.dumps(value, indent=2) + "\n")
     temporary.replace(path)
 
 
-def sha256(path):
+def sha256(path: Path) -> str:
+    """SHA-256 checksum of a file, used to detect changed or corrupted files."""
     with path.open("rb") as stream:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def get(url, settings, params=None):
+def get(url: str, settings: dict, params: dict | None = None) -> requests.Response:
+    """GET with retries and backoff for rate limits (429) and server errors (5xx).
+
+    Other 4xx responses mean a bad query, so they fail immediately instead of retrying.
+    """
     headers = {"User-Agent": "nyc-housing-data/0.1 (public research)"}
     if os.environ.get("SOCRATA_APP_TOKEN"):
         headers["X-App-Token"] = os.environ["SOCRATA_APP_TOKEN"]
@@ -62,14 +69,15 @@ def get(url, settings, params=None):
             time.sleep(min(2**attempt, 16))
 
 
-def check_schema(source, metadata):
+def check_schema(source, metadata: dict) -> None:
+    """Fail if the live dataset no longer has every column this project requests."""
     fields = {column["fieldName"] for column in metadata["columns"]}
     missing = set(source.columns) - fields
     if missing:
         raise ValueError(f"{source.dataset_id}: missing source columns {sorted(missing)}")
 
 
-def get_page(url, settings, params):
+def get_page(url: str, settings: dict, params: dict) -> requests.Response:
     """A slow page can be retried at a smaller size without changing its selection."""
     for attempt in range(settings.get("attempts", 4)):
         try:
@@ -82,7 +90,13 @@ def get_page(url, settings, params):
             time.sleep(min(2**attempt, 16))
 
 
-def extract_partition(root, name, label, where, settings):
+def extract_partition(root: Path, name: str, label: str, where: str | None, settings: dict) -> dict:
+    """Download one source/year partition to a gzipped CSV and return its manifest.
+
+    Rows are fetched in primary-key order (keyset pagination). The source row count is
+    checked before and after the download; any mismatch fails the partition. A finished
+    partition is skipped on rerun if its checksum and query still match.
+    """
     source = SOURCES[name]
     path = root / "raw" / name / f"{label}.csv.gz"
     manifest_path = root / "manifests" / f"{name}-{label}.json"
@@ -158,7 +172,8 @@ def extract_partition(root, name, label, where, settings):
     return manifest
 
 
-def download(root, config):
+def download(root: Path | str, config: dict) -> None:
+    """Download every source partition into a snapshot folder, resuming if interrupted."""
     root = Path(root)
     settings = config["download"]
     study = config["study"]

@@ -1,4 +1,4 @@
-# Phase 2: extraction, validation, and linkage audit
+# Extraction, validation and linkage audit (Phase 2)
 
 Generated from the local frozen extracts completed at **2026-11-05T17:44:45.707375+00:00**.
 Configured event window: **2021–2025**, using complaint receipt and violation inspection dates.

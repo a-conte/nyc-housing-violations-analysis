@@ -1,4 +1,4 @@
-from housing.phase3 import build
+from housing.cohort import build
 
 
 def prepare(con):

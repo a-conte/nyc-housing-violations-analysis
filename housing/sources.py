@@ -122,7 +122,8 @@ SOURCES = {
 }
 
 
-def partitions(source, start, end):
+def partitions(source, start: int, end: int) -> list[tuple[str, str | None]]:
+    """Split a source into (label, SoQL filter) pairs: one per year, plus undated rows."""
     if source.date is None:
         return [("all", None)]
     annual = [

@@ -4,7 +4,7 @@
 
 This document preserves the original proposal and the decisions known at each phase, rather
 than serving as a checklist of implemented features. The [root README](../README.md) describes
-the completed project; [Phase 6](../reports/phase6/README.md) supplies the final investigative
+the completed project; [Phase 6](../reports/leads/README.md) supplies the final investigative
 report. Phases 2–7 are complete. Earlier statements such as “no rankings” refer to those earlier
 phase outcomes, not the final project.
 
@@ -23,9 +23,9 @@ alone and what requires retained local data.
 ## Research and analytical design
 
 **Status:** Approved with portfolio-scope adjustments; Phase 2 completed November 5, 2026.
-See the [data-quality review](../reports/phase2/QUALITY_REVIEW.md) for unresolved cohort and
+See the [data-quality review](../reports/data_quality/QUALITY_REVIEW.md) for unresolved cohort and
 exposure decisions. Phase 3 subsequently defined a current-stock cohort and SQL features;
-see [the Phase 3 report](../reports/phase3/README.md). Historical occupancy remains unverified.
+see [the Phase 3 report](../reports/cohort/README.md). Historical occupancy remains unverified.
 **Research date:** November 2, 2026.  
 **Intended use:** Portfolio-quality code sample for a Data Scientist position with the Research & Analytics Department of the New York State Attorney General.
 
@@ -479,7 +479,7 @@ nyc-housing-data/
 ├── tests/                   # Focused ETL and analytical-contract tests
 ├── docs/
 │   └── analytical_design.md
-├── reports/phase2/          # Aggregate audit outputs and findings
+├── reports/data_quality/          # Aggregate audit outputs and findings
 ├── notebooks/              # 1–2 polished notebooks in the final project
 └── data/                   # Ignored raw snapshots and local DuckDB database
 ```
@@ -502,14 +502,14 @@ The design is approved with the scope adjustments above. Phase 2 must confirm so
 
 ## Phase 4 implementation outcome
 
-The [Phase 4 report](../reports/phase4/README.md) records retrospective 2025 evaluation,
+The [Phase 4 report](../reports/baseline_models/README.md) records retrospective 2025 evaluation,
 Poisson overdispersion, NB2 comparisons, and denominator/linkage/window sensitivities.
 Mean calibration, especially for large buildings, remains inadequate for formal anomaly
 thresholds. No final investigative rankings have been produced.
 
 ## Phase 5 implementation outcome
 
-[Phase 5](../reports/phase5/README.md) tested three prespecified adjustments with only
+[Phase 5](../reports/model_validation/README.md) tested three prespecified adjustments with only
 pre-2025 validation. Piecewise-size NB2 improved retrospective mean calibration;
 conditional uncertainty and historical-activity miscalibration remain explicit limitations.
 No investigative rankings or formal significance thresholds have been produced.

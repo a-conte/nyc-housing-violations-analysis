@@ -5,7 +5,7 @@ import duckdb
 from housing.database import export_csv, markdown_table
 
 c = duckdb.connect("data/housing.duckdb", read_only=True)
-p = Path("reports/phase3")
+p = Path("reports/cohort")
 q = """WITH v AS (SELECT building_id,count(*) violations FROM clean.violations WHERE in_study GROUP BY 1), a AS (SELECT building_id,sum(complaints) complaints FROM mart.building_year GROUP BY 1)
 SELECT step,count(*) FILTER(WHERE eligibility_step>=step) retained_buildings,
 sum(complaints) FILTER(WHERE eligibility_step>=step) retained_complaints,
@@ -23,11 +23,11 @@ q3 = """WITH d AS (SELECT event_month,violation_class,count(*) n,count(DISTINCT 
 SELECT * FROM d WHERE event_month IN (SELECT event_month FROM audit.monthly_coverage WHERE source='violations' AND (year_over_year_ratio<0.5 OR year_over_year_ratio>2)) ORDER BY 1,2"""
 export_csv(c, q3, p / "shift_composition.csv")
 (p / "README.md").write_text(
-    """# Phase 3: analytical cohort and SQL features
+    """# Analytical cohort and SQL features (Phase 3)
 
 Completed using the existing frozen inputs; no models or new source downloads.
-Reproduce with `python -m housing.phase3` after Phase 2. SQL lives in
-`sql/phase3/features.sql`. Rebuilds replace only the analytical schema tables inside a transaction.
+Reproduce with `python -m housing.cohort` after Phase 2. SQL lives in
+`sql/cohort/features.sql`. Rebuilds replace only the analytical schema tables inside a transaction.
 
 ## Denominator decision
 
@@ -80,7 +80,7 @@ but B/C ratios span 0.915–1.448. Class A/I composition accounts for much of th
 this is compatible with administrative batches as well as changes in recorded activity and
 is not evidence of a cause. shift_composition.csv adds distinct buildings, order-code diversity
 and peak inspection-day counts for each flagged month/class. Compare with
-../phase2/monthly_change_review.csv; no months are deleted, adjusted or imputed.
+../data_quality/monthly_change_review.csv; no months are deleted, adjusted or imputed.
 400 approval dates precede inspection; inspection remains the event date. Date sensitivity remains necessary.
 
 ## Feature contract and readiness

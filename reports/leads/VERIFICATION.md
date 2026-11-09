@@ -1,4 +1,4 @@
-# Phase 6 completion review — November 9, 2026
+# Leads completion review (Phase 6) — November 9, 2026
 
 Phase 6 is complete. The existing selection implementation, analytical snapshot, queues,
 lead/profile/history tables, sensitivity outputs and figure were already generated when this
@@ -26,7 +26,7 @@ population restriction is distinct from the 25-of-26 denominator-switch result.
 
 ## Evidence and checks
 
-`tests/test_phase6_outputs.py` reconciles saved artifacts without running the Phase 6 pipeline:
+`tests/test_leads_outputs.py` reconciles saved artifacts without running the Phase 6 pipeline:
 
 - All 145,832 current-cohort rows, exposure fields and property features against read-only
   DuckDB analytical views; annual B/C against distinct individual violation records, and

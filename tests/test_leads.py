@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from housing.phase6 import choose, overlap, peer_summary
+from housing.leads import choose, overlap, peer_summary
 
 
 def frame():

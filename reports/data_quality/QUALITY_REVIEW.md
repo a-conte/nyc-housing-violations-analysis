@@ -1,4 +1,4 @@
-# Phase 2 data-quality review — November 5, 2026
+# Data-quality review (Phase 2) — November 5, 2026
 
 **Phase 2 is complete.** The verified snapshot is loaded into `data/housing.duckdb`.
 All **17 blocking database checks pass**. No Phase 3 modeling or analytical notebooks were

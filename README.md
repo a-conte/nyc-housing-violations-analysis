@@ -1,178 +1,172 @@
 # NYC Housing Anomaly Analysis
 
-**Which buildings warrant closer review because of unusually high or persistent recorded
-housing complaints and violations relative to comparable properties?**
+**Which New York City apartment buildings have far more serious housing violations than
+similar buildings, and should get a closer look?**
 
-This investigative data science project turns public administrative records into auditable
-building-level review leads. It demonstrates Python data acquisition, substantive DuckDB/SQL,
-interpretable count models, and the judgment needed to separate a useful investigative signal
-from a defensible statistical conclusion. It is an independent portfolio project, not an
-agency investigation or a finding about any owner.
+When a building has a dangerous problem, like no heat, lead paint or rodents, a city
+inspector can issue a violation. This project focuses on the two serious classes: Class B
+("hazardous") and Class C ("immediately hazardous"). It uses five years of public NYC records
+(2021–2025, about 9.4 million rows) to find buildings whose violation counts are unusually
+high compared with buildings of the same size, age and borough.
 
-**Result: 27 exploratory leads, not 27 statistically validated anomalies.** Model calibration
-is imperfect, and the review rules control workload rather than false-positive rates.
-The analysis covers **2021–2025** activity in a fixed cohort of **145,832 current buildings**.
-B/C combines Class B (hazardous) and Class C (immediately hazardous) violations.
-Documentation and verification are complete through Phase 7.
+## The short answer
 
-## Findings at a glance
+Out of **145,832 apartment buildings**, the analysis flags **27 buildings** for a closer look.
 
-| Verified result | What it means |
+- Those 27 buildings received **11,328 serious violations in 2025**, about **420 each**. The
+  average building in the study had about **4**.
+- They are 0.02% of the buildings but account for **2%** of all serious violations.
+- **23 of the 27** also had serious violations in every year from 2021 to 2024, so for most
+  of them this was not a one-year spike.
+
+These are **leads, not conclusions**. A high violation count shows that a building deserves a
+review of its records, not that its owner broke the law. See [What this can't tell
+you](#what-this-cant-tell-you).
+
+![Left: every building in the study, with the 27 flagged buildings circled. Right: violation history for four example buildings.](reports/leads/investigative_context.png)
+
+*Left: each shaded cell is a group of buildings; the circles are the 27 flagged buildings,
+which sit well above others of the same size. Right: four example buildings, chosen by fixed
+rules, show how violations climbed in 2024 and 2025.*
+
+## How it works
+
+### 1. Collect the data
+
+The project downloads four public datasets from [NYC Open Data](https://opendata.cityofnewyork.us/):
+
+| Dataset | What it contains |
 | --- | --- |
-| 27 selected BuildingIDs account for **11,328 B/C violations** in 2025 | 1.98% of the cohort's 571,613 recorded B/C violations; not independent defects or affected households |
-| **23 of 27** had B/C activity in every year from 2021 through 2024 | Recurrence of recorded activity, not proof that the same conditions remained unrepaired |
-| Excluding shared-lot or geographic ambiguities retained **23 of 27** | Four primary leads were removed and four replacement leads entered |
-| Switching HPD to PLUTO units retained **25 of 26** comparable selections | Rate-denominator sensitivity on an identical, restricted population; model expectations stayed frozen |
-| Requiring agreeing unit counts retained **16 of 27** primary leads | Population restriction matters more than the denominator switch alone; the restricted queues contain 23 leads |
+| [HPD complaints](https://data.cityofnewyork.us/d/ygpa-z7cr) | Tenant complaints, like "no hot water" |
+| [Housing Maintenance Code violations](https://data.cityofnewyork.us/d/wvxf-dwi5) | Violations issued by inspectors |
+| [HPD buildings](https://data.cityofnewyork.us/d/kj4p-ruqc) | Each building's ID and number of apartments |
+| [PLUTO](https://data.cityofnewyork.us/d/64uk-42ks) | Property details, like the year built |
 
-The comparable HPD population itself retains **21 of the 27** primary leads. That restriction
-must be distinguished from the subsequent 25-of-26 denominator comparison. No primary lead
-has a recorded event-geography conflict, but missing flags do not prove correct linkage.
-Counts and membership are available in the [investigative report](reports/phase6/README.md),
-[sensitivity table](reports/phase6/sensitivity.csv), and [verification record](reports/phase6/VERIFICATION.md).
+The downloader checks its own work. It counts the rows in each dataset before and after
+downloading and stops if anything went missing. It also saves a fingerprint (a SHA-256
+checksum) of every file, so later steps can prove they used the exact same data.
 
-![Selected leads within the cohort, with four illustrative annual histories](reports/phase6/investigative_context.png)
+### 2. Clean and link the records
 
-Left: building capacity and B/C burden on log(1+x) axes, retaining zeros. Right: four
-illustrative profiles chosen by explicit rules, with 2025 separated from prior years.
-Profiles illustrate raw-count, rate, residual and denominator-review cases; they are not a
-representative sample or a ranking of the worst properties.
+The datasets are loaded into a [DuckDB](https://duckdb.org/) database and cleaned with SQL.
+Linking a violation to the right building is harder than it sounds: the city uses three
+different IDs (building ID, tax lot and building number) that don't always agree. The SQL
+flags every mismatch instead of guessing. A set of 17 automatic checks must all pass before
+the database is used.
 
-## How leads were selected
+### 3. Pick a fair comparison group
 
-Common gates require at least 10 HPD apartments, 20 recorded B/C violations in 2025,
-2 expected violations, 10 observed-minus-expected violations, and an observed/expected
-ratio of at least 2, within the cohort's full-year source coverage. From this screen,
-take the top ten buildings separately by raw B/C count, B/C per 100 apartments, and
-NB2 Pearson residual. Break ties by numeric BuildingID and deduplicate the union.
-There is no composite score. The [selection plan](reports/phase6/selection_plan.json) and
-[indicator queues](reports/phase6/indicator_queues.csv) expose the rules and every selection reason.
+To compare like with like, the study keeps only buildings that:
 
-These are **operational review rules documented after the 2025 model evaluation**, not
-preregistered holdout thresholds, calibrated tail probabilities, or error-rate controls.
-Agreement among related indicators does not provide independent statistical confirmation.
-Persistence was not a selection gate or ranking variable, but historical records were model
-training outcomes; it is descriptive context, not independent corroboration. Complaints can
-prompt inspections, so complaint/violation agreement is also not independent evidence.
+- have at least 3 apartments and are not public housing (NYCHA),
+- were built before 2021 and not majorly altered since, and
+- have clean IDs that link to exactly one building.
 
-## Data and population
+This leaves 145,832 buildings. Buildings with zero violations stay in, because they are part of
+"normal".
 
-| Public NYC Open Data source | Grain and use |
+### 4. Predict how many violations each building "should" have
+
+Bigger buildings naturally get more violations, so raw counts aren't fair. A statistical
+model predicts each building's expected number of serious violations from its number of
+apartments, age, borough and year. The model learns from 2021–2024 and is then tested on 2025.
+
+Violations are very uneven: about 80% of buildings have none in a given year, while a few
+have hundreds. A basic Poisson model can't handle that spread, so the project uses a
+**negative binomial** model, which is designed for it.
+
+### 5. Flag the outliers
+
+A building is considered only if, in 2025, it had at least **10 apartments**, at least **20
+serious violations**, a prediction of at least **2**, at least **10 more than predicted**, and at
+least **twice** its prediction.
+From those 3,934 buildings, the project takes the top 10 in each of three lists:
+
+1. most serious violations in total,
+2. most serious violations per apartment, and
+3. most surprising compared with the model's prediction.
+
+Some buildings appear on more than one list. Combined, the lists contain **27 buildings**.
+There is no secret combined score; every building's reason for selection is listed in
+[indicator_queues.csv](reports/leads/indicator_queues.csv).
+
+## Is the result reliable?
+
+**The model gets the overall picture right.** Across all buildings, actual 2025 violations
+were 93% of what the model predicted, and 98% of buildings fell inside the model's 95% range.
+
+**It struggles with history.** Buildings with a long record of violations got about 2.6 times
+more than predicted, and buildings with no history got far fewer. A building's past matters
+more than size and age alone can capture.
+
+**The flagged list holds up when the rules change:**
+
+| If we… | Buildings that stayed flagged |
 | --- | --- |
-| [HPD complaints and problems — ygpa-z7cr](https://data.cityofnewyork.us/d/ygpa-z7cr) | Distinct complaints and their problem rows, dated by receipt |
-| [Housing Maintenance Code violations — wvxf-dwi5](https://data.cityofnewyork.us/d/wvxf-dwi5) | Distinct violations, dated by inspection; Class B and C kept separate and combined |
-| [HPD buildings — kj4p-ruqc](https://data.cityofnewyork.us/d/kj4p-ruqc) | BuildingID, current apartment capacity, inventory and management attributes |
-| [PLUTO — 64uk-42ks](https://data.cityofnewyork.us/d/64uk-42ks) | Tax-lot characteristics, construction/alteration years and residential-unit comparison |
+| drop buildings whose IDs are uncertain | 23 of 27 |
+| count apartments using PLUTO instead of HPD records (only buildings where both counts exist) | 25 of 26 |
+| keep only buildings where both sources agree on apartment count | 16 of 27 |
 
-The retained snapshot contains **9,439,989 source rows**, extracted November 2 and 5, 2026.
-Two corrupted partitions were replaced and audited; all 17 blocking Phase 2 integrity checks
-passed. The [quality review](reports/phase2/QUALITY_REVIEW.md) documents repairs and exclusions.
-Source selection is explicit in [housing/sources.py](housing/sources.py).
+## What this can't tell you
 
-The final cohort requires valid identifiers, current active status, at least three HPD
-apartments, zero reported Class B rooms, known non-NYCHA management, and PLUTO residential
-use. It excludes shared active BINs, missing or post-start construction years, and recorded
-alterations at or after 2021. Both sources must cover all study months. This is current stock
-with conservative history screens, not a reconstruction of all historical rental housing.
-Class B rooms are an inventory field, distinct from Class B violations.
+- **Violations measure inspections, not just conditions.** A violation only exists if
+  someone complained and an inspector came. Buildings where tenants report less may look
+  better than they are.
+- **The apartment counts are today's.** A building's size in 2021 may have been different.
+- **The selection rules were chosen after seeing 2025.** They keep the list to a reviewable
+  size; they are not proven cutoffs.
+- **Linking records is imperfect.** Some violations may be attached to the wrong building.
 
-HPD apartments supply building capacity; PLUTO lot totals are never assigned wholesale to
-multiple buildings. Agreement is a sensitivity subset, not the final primary denominator
-rule. Zero-event buildings remain in the cohort. See the [cohort contract](reports/phase3/README.md).
+Before anyone acted on these results, each building's records and identity would need to be
+checked by hand. This analysis does not show wrongdoing, ongoing defects or what caused them.
 
-## Analytical workflow and technical implementation
+## Guide to the code
 
-| Stage | Implementation and evidence |
+| Step | Where to look |
 | --- | --- |
-| Acquire and validate | [Python downloader](housing/download.py): schema checks, keyset pagination, retries, resumable partitions, source-count reconciliation and SHA-256 manifests |
-| Normalize and link | [DuckDB orchestration](housing/database.py) and [SQL](sql/): typed identifiers/dates, BuildingID joins, BBL/BIN conflict flags, cardinality checks and event conservation |
-| Engineer features | [Cohort SQL](sql/phase3/features.sql): building/year rows, distinct complaints/problems, separate B/C, zero activity, persistence and capacity-based exposure; earlier SQL also supplies monthly/rolling metrics |
-| Fit count baselines | [Phase 4](housing/phase4.py): Poisson log-link baseline, then NB2 after training Pearson dispersion of 33.37; size, age, borough and calendar controls with apartment exposure |
-| Diagnose and validate | [Phase 5](housing/phase5.py): 2023/2024 rolling validation, piecewise-size NB2 selection, refit through 2024, frozen 2025 evaluation, subgroup calibration and paired BBL bootstrap diagnostics |
-| Review leads | [Phase 6](housing/phase6.py): saved predictions, separate indicator queues, illustrative histories, descriptive peers and denominator/linkage sensitivity; no model refit |
+| Download and verify data | [housing/download.py](housing/download.py), [housing/sources.py](housing/sources.py) |
+| Load into DuckDB and run checks | [housing/database.py](housing/database.py), [sql/](sql/) |
+| Link records across IDs | [sql/02_linkage.sql](sql/02_linkage.sql) |
+| Build the comparison group and features | [sql/cohort/features.sql](sql/cohort/features.sql), [housing/cohort.py](housing/cohort.py) |
+| Fit and test the models | [housing/baseline_models.py](housing/baseline_models.py), [housing/model_validation.py](housing/model_validation.py) |
+| Select the 27 buildings | [housing/leads.py](housing/leads.py) |
+| Tests | [tests/](tests/) |
 
-Python uses requests, pandas, NumPy, SciPy, statsmodels and Matplotlib; DuckDB performs the
-core relational transformations. There is no required cloud account or notebook runtime.
-No owner attribution, Isolation Forest, dashboard or agent workflow was implemented.
-The [original design and final scope note](docs/analytical_design.md) preserve that distinction.
+The [reports/](reports/) folder holds the saved results of each stage, in the order the work
+was done:
 
-![Annual recorded complaints and separate B/C counts, with zero-B/C prevalence](reports/phase4/annual_trends.png)
+| Folder | What's inside |
+| --- | --- |
+| [data_quality](reports/data_quality/QUALITY_REVIEW.md) | Checks on the raw data, and what was fixed or excluded |
+| [cohort](reports/cohort/README.md) | How the comparison group was chosen |
+| [baseline_models](reports/baseline_models/README.md) | First models and exploratory charts |
+| [model_validation](reports/model_validation/README.md) | How the final model was chosen and how well it fits |
+| [leads](reports/leads/README.md) | The 27 flagged buildings, in full detail |
+| [publication_review](reports/publication_review/VERIFICATION.md) | Final checks before publishing |
 
-Recorded B/C rises through 2024 and falls in 2025, while complaints follow a different path.
-Roughly 80% of building-years have zero recorded B/C. Neither pattern identifies underlying
-housing conditions independently of reporting and inspection activity.
+Inside the reports, the stages are called Phase 2 through Phase 7.
 
-![Temporal rates, nonlinear size relationship and final size-group calibration](reports/phase5/diagnostics.png)
+The full design reasoning is in [docs/analytical_design.md](docs/analytical_design.md).
 
-The size-adjusted NB2 model improves broad mean calibration, but does not validate anomaly
-tails. Its 2025 aggregate observed/expected ratio is **0.932**, and conditional 95% count
-intervals cover **98.37%** of observations. Historical-activity groups remain poorly
-calibrated: O/E is **2.60** for the 20+ prior-mean-annual-B/C group and **0.15** for zero
-history. The middle plot uses log axes and omits zero-rate dots; its underlying CSV retains
-them. See [calibration evidence and uncertainty qualifications](reports/phase5/README.md).
+## Run it yourself
 
-## Limitations and responsible interpretation
-
-- **Historical exposure:** Current units, eligibility and property attributes do not establish
-  historical occupancy, rental tenure or stable physical capacity. Survivor selection remains.
-- **Linkage:** BuildingID, BIN and tax lot are different entities. Shared lots, conflicting
-  keys and absent values limit physical-property attribution; a zero conflict count is not verification.
-- **Reporting and inspection:** No complete inspection denominator is available. Recorded
-  counts reflect access to reporting and enforcement opportunity as well as conditions.
-  Multiple violations may arise from one inspection; duplicate-flagged problems remain visible.
-- **Calibration and evaluation:** Size adjustment does not resolve historical heterogeneity,
-  serial/spatial dependence or the 2025 trend reversal. The model choice used pre-2025 folds,
-  but specification work followed Phase 4's examination of 2025; this is retrospective
-  evaluation, not an untouched test or demonstrated deployment performance.
-- **Uncertainty and source revisions:** Count intervals condition on fitted parameters.
-  The lot bootstrap measures conditional empirical stability, not all uncertainty. Live
-  records and statuses change; mixed extraction dates cannot reconstruct repair histories.
-  Full source-month coverage does not establish complete reporting. Alternative violation-date
-  sensitivity remains unresolved.
-
-Consequential use requires verification of source records, property identity and exposure.
-These findings do not establish wrongdoing, continued defects, causal effects, or investigative accuracy.
-
-## Setup and review without downloading data
-
-Use Python **3.11+** and `uv`, from the repository root. The retained run used Python 3.14;
-[pyproject.toml](pyproject.toml) declares dependencies and [uv.lock](uv.lock) pins resolution.
+You need Python 3.11+ and [uv](https://docs.astral.sh/uv/). You can run the tests without
+downloading any NYC data:
 
 ```sh
 uv sync --locked
-uv run python -m housing --help
 uv run python -m pytest -q
-uv run python -m ruff check .
-uv run python -m ruff format --check .
-uv run python scripts/check_docs.py
 ```
 
-Dependency installation needs network access unless cached. A public clone can run synthetic
-ETL/model tests and report/provenance checks without NYC data. Four local-data reconciliation
-tests skip when the ignored database/snapshot is absent. With the retained local inputs,
-**44 tests pass with no skips**. This does not mean a fresh live-source rebuild was rerun
-for the documentation review.
+This runs 44 tests. Four of them compare against the full local dataset and are skipped if
+you haven't downloaded it. To rebuild everything from scratch (several GB of disk space),
+follow [docs/reproduction.md](docs/reproduction.md).
 
-For a full rebuild, cached-data review, exact prerequisites, overwrite behavior and resource
-requirements, follow [reproduction instructions](docs/reproduction.md). The pipeline processes
-millions of rows: the retained compressed source files occupy about 187 MiB and the database
-about 921 MiB, before temporary build files and Python/model memory. Allow several GB of free
-disk; the configured DuckDB memory limit is 4 GB. End-to-end runtime was not benchmarked.
+## Privacy
 
-## Repository guide
+The output files identify buildings only by HPD's public building ID. They contain no
+addresses, apartment numbers, owner names or tenant information.
 
-- [housing/](housing/) — acquisition, database orchestration, models and report renderers.
-- [sql/](sql/) — staging, linkage, metrics, audits and cohort features.
-- [tests/](tests/) — synthetic edge cases and saved-output reconciliation.
-- [reports/phase2/](reports/phase2/) and [phase3/](reports/phase3/) — source audit and cohort decisions.
-- [reports/phase4/](reports/phase4/) and [phase5/](reports/phase5/) — baseline and calibration evidence.
-- [reports/phase6/](reports/phase6/) — final investigative report, lead tables and verification.
-- [Phase 7 publication review](reports/phase7/VERIFICATION.md) — setup, artifact and link checks.
-
-Earlier reports record what was known at each phase; their provisional decisions and test
-counts are historical. The root README describes the completed scope. Raw extracts, full
-prediction files, DuckDB, environments and caches are ignored; lightweight reports and frozen
-coefficients are retained. Published BuildingIDs are public administrative identifiers, not
-anonymized properties. Lead exports omit addresses, apartment identifiers and owner/resident
-contact information. No code license has been selected; source-data access is governed by
-NYC's terms, separately from any future code license.
+This is an independent portfolio project, not an investigation by any government agency.
+Code is released under the [MIT License](LICENSE). NYC data is subject to
+NYC Open Data's terms of use.

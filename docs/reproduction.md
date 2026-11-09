@@ -28,11 +28,11 @@ cohort export are deliberately excluded. A public checkout runs 40 tests and ski
 local-data integration tests; the retained working dataset runs all 44. The tests include
 small synthetic fits, not a refit of the published full-data models.
 
-Read [the report](../reports/phase6/README.md) without installing anything. To check its saved
+Read [the report](../reports/leads/README.md) without installing anything. To check its saved
 Markdown/provenance and synthetic selection rules specifically:
 
 ```sh
-uv run python -m pytest tests/test_phase6.py tests/test_phase6_outputs.py -q
+uv run python -m pytest tests/test_leads.py tests/test_leads_outputs.py -q
 ```
 
 Exact numerical reproduction needs the original local `data/snapshot/`, including repair
@@ -51,10 +51,10 @@ first: commands overwrite generated phase reports and local analytical outputs.
 
 ```sh
 uv run python -m housing run
-uv run python -m housing.phase3
-OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 uv run python -m housing.phase4
-OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 uv run python -m housing.phase5
-uv run python -m housing.phase6
+uv run python -m housing.cohort
+OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 uv run python -m housing.baseline_models
+OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 uv run python -m housing.model_validation
+uv run python -m housing.leads
 uv run python -m pytest -q
 ```
 
@@ -62,11 +62,11 @@ Execution order and side effects:
 
 | Command | Required input | Output and behavior |
 | --- | --- | --- |
-| `housing run` | Public API access; `config.toml` | Downloads/reuses `data/snapshot`, validates it, builds `data/housing.duckdb`, writes `reports/phase2` |
-| `housing.phase3` | Phase 2 database and provenance | Replaces the analytical schema transactionally; writes `reports/phase3` |
-| `housing.phase4` | Phase 3 analytical tables | Fits baseline/sensitivity models; writes `data/phase4` and `reports/phase4` |
-| `housing.phase5` | Phase 3 tables and Phase 4 code | Fits rolling comparisons and final models; writes `data/phase5`, coefficients, decision and reports |
-| `housing.phase6` | Phase 3 tables, Phase 5 decision/parameters and `data/phase5/nb_size_2025.csv.gz` | Checks frozen predictions, writes lead outputs and `data/phase6`; does not fit models |
+| `housing run` | Public API access; `config.toml` | Downloads/reuses `data/snapshot`, validates it, builds `data/housing.duckdb`, writes `reports/data_quality` |
+| `housing.cohort` | Phase 2 database and provenance | Replaces the analytical schema transactionally; writes `reports/cohort` |
+| `housing.baseline_models` | Phase 3 analytical tables | Fits baseline/sensitivity models; writes `data/baseline_models` and `reports/baseline_models` |
+| `housing.model_validation` | Phase 3 tables and Phase 4 code | Fits rolling comparisons and final models; writes `data/model_validation`, coefficients, decision and reports |
+| `housing.leads` | Phase 3 tables, Phase 5 decision/parameters and `data/model_validation/nb_size_2025.csv.gz` | Checks frozen predictions, writes lead outputs and `data/leads`; does not fit models |
 
 Phase 5 reuses Phase 4 fitting code, not its saved model predictions. Phase 4 is included
 above to reproduce the full baseline report. Phases 3–6 use fixed paths and a 2021–2025
@@ -82,7 +82,7 @@ To rebuild the database without network requests, use the loader rather than `ru
 
 ```sh
 uv run python -m housing load --snapshot data/snapshot
-uv run python -m housing.phase3
+uv run python -m housing.cohort
 ```
 
 Loading verifies selection, metadata, byte counts, hashes, gzip decompression and row counts.
@@ -94,13 +94,13 @@ If the retained database and matching Phase 5 predictions already exist, verify 
 rewriting any report or refitting:
 
 ```sh
-uv run python -m pytest tests/test_phase6_outputs.py -q
+uv run python -m pytest tests/test_leads_outputs.py -q
 ```
 
 To deliberately regenerate Phase 6 from those matching inputs:
 
 ```sh
-uv run python -m housing.phase6
+uv run python -m housing.leads
 ```
 
 For a separate live extraction, both acquisition and loading accept explicit paths:
@@ -110,7 +110,7 @@ uv run python -m housing download --snapshot data/new-snapshot
 uv run python -m housing load --snapshot data/new-snapshot
 ```
 
-The loader still defaults to `data/housing.duckdb` and `reports/phase2`. The Phase 2 CLI also
+The loader still defaults to `data/housing.duckdb` and `reports/data_quality`. The Phase 2 CLI also
 accepts `--config`, `--database` and `--report-dir`; later runners do not accept those options.
 Do not pass `--help` to a phase runner: unlike the acquisition CLI, those modules have no
 argument parser and will execute their work.
@@ -133,6 +133,6 @@ not benchmarked and depends on throttling, hardware and source revisions. The BL
 above limit thread oversubscription; they do not guarantee identical floating-point results
 across platforms. Timestamps and compressed-file bytes can also differ across regenerations.
 
-The [Phase 7 verification record](../reports/phase7/VERIFICATION.md) distinguishes commands
+The [Phase 7 verification record](../reports/publication_review/VERIFICATION.md) distinguishes commands
 actually run from code-path inspection and historical validation. No full-data refitting or
 live-source download was performed for that review.

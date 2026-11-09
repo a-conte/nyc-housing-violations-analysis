@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from housing.phase5 import bootstrap, estimate, matrix, select
+from housing.model_validation import bootstrap, estimate, matrix, select
 
 
 def rows():

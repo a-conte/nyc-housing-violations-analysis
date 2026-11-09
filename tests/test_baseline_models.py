@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from housing.phase4 import design, fit, score, validate
+from housing.baseline_models import design, fit, score, validate
 
 
 def sample():

@@ -1,4 +1,4 @@
-# Phase 7: final documentation and publication review
+# Final documentation and publication review (Phase 7)
 
 Completed November 9, 2026. This phase prepared the public repository; it did not extend the
 analysis, download data, refit models, commit, push or publish anything.
@@ -53,7 +53,7 @@ fits within the test suite are distinct from retraining the published model.
 
 ## Consistency and provenance
 
-The headline findings match [Phase 6 evidence](../phase6/VERIFICATION.md): 27 leads, 11,328
+The headline findings match [Phase 6 evidence](../leads/VERIFICATION.md): 27 leads, 11,328
 B/C violations, 23 with B/C in every prior year, clean-linkage retention 23/27 and comparable
 HPD-to-PLUTO retention 25/26. The README also distinguishes comparable-population restriction
 (21/27 retained) and agreement-only selection (16/27 retained, 23 scenario leads).
@@ -85,10 +85,36 @@ were checked. Historical provenance was not overwritten to imply a new analytica
 - Historical exposure, property linkage, inspection/reporting opportunity, alternative event
   dates and imperfect calibration remain substantive limitations. No formal anomaly or
   wrongdoing claim is supported, and consequential use requires source-record review.
-- No code license has been selected. A maintainer should decide reuse terms before presenting
-  the code as licensed open source. NYC source-data terms are separate.
+- No code license had been selected at this review; the MIT License was added on November 9,
+  2026 (see below). NYC source-data terms are separate.
 - External URLs were preserved as source/documentation references, not checked for live
   availability in this phase. Internal links and figure references were checked.
 
 No unresolved local test, formatting, internal-link or publication-inventory failure remains.
 Publication itself remains a maintainer action; Phase 7 stops here.
+
+## Post-review code cleanup — November 9, 2026
+
+Readability changes only; no analytical logic, thresholds or outputs changed.
+
+- Modules were renamed from stage numbers to what they do: `phase3` → `cohort`,
+  `phase3_review` → `cohort_report`, `phase4` → `baseline_models`, `phase4_report` →
+  `baseline_report`, `phase5` → `model_validation`, `phase5_report` → `validation_report`,
+  `phase6` → `leads`, `phase6_report` → `leads_report`. `sql/phase3/features.sql` moved to
+  `sql/cohort/features.sql`. Tests were renamed to match.
+- Report folders were renamed the same way: `phase2` → `data_quality`, `phase3` → `cohort`,
+  `phase4` → `baseline_models`, `phase5` → `model_validation`, `phase6` → `leads`,
+  `phase7` → `publication_review` (and the local `data/phase4–6` folders to match). Report
+  titles now lead with the topic and keep the phase number in parentheses; text inside the
+  reports still refers to phases, the order in which the work was done.
+- `sql/cohort/features.sql` was reformatted. Run against a copy of the database, it produced the
+  same columns, column order and rows (zero differences in either direction) for all five
+  analytical tables. `python -m housing.cohort` was then rerun; only the cohort `provenance.json`
+  changed.
+- Docstrings and type hints were added to the acquisition, database and baseline-model modules;
+  embedded SQL strings were reformatted; a `/tmp` Matplotlib cache override was removed.
+- `python -m housing.leads` was rerun so the leads provenance records the renamed code. Every
+  leads output except `provenance.json`, and the local 2025 snapshot, was byte-identical.
+- Phases 4 and 5 were not refit. Their recorded code hashes describe the files under their
+  old names at commit `a9c9722` and earlier, as documented above.
+- The MIT License was added.

@@ -1,9 +1,10 @@
-"""Exploratory lead review with frozen Phase 5 predictions; no model fitting."""
+"""Select buildings for closer review, using the frozen Phase 5 model's 2025 predictions.
 
-import os
+Run with `python -m housing.leads`. Applies the screening gates in PLAN, takes the top ten
+buildings separately by raw count, rate and residual, and writes lead tables, sensitivity
+checks and the Phase 6 report. It never refits a model.
+"""
 
-os.environ.setdefault("MPLCONFIGDIR", "/tmp/housing-matplotlib")
-os.environ.setdefault("XDG_CACHE_HOME", "/tmp/housing-cache")
 import json
 from pathlib import Path
 
@@ -14,7 +15,7 @@ import pandas as pd
 
 from housing.database import PROJECT
 from housing.download import now, sha256
-from housing.phase5 import matrix
+from housing.model_validation import matrix
 
 PLAN = {
     "year": 2025,
@@ -99,35 +100,59 @@ def overlap(base, other):
 
 
 def main():
-    report = PROJECT / "reports/phase6"
+    report = PROJECT / "reports/leads"
     report.mkdir(parents=True, exist_ok=True)
-    local = PROJECT / "data/phase6"
+    local = PROJECT / "data/leads"
     local.mkdir(exist_ok=True)
     (report / "selection_plan.json").write_text(json.dumps(PLAN, indent=2) + "\n")
-    decision = json.loads((PROJECT / "reports/phase5/decision.json").read_text())
+    decision = json.loads((PROJECT / "reports/model_validation/decision.json").read_text())
     if decision["selected"] != "nb_size":
         raise ValueError("Unexpected frozen model")
-    parameter_path = PROJECT / "reports/phase5/parameters.json"
+    parameter_path = PROJECT / "reports/model_validation/parameters.json"
     original_hash = sha256(parameter_path)
     parameters = json.loads(parameter_path.read_text())["nb_size"]
-    predictions_path = PROJECT / "data/phase5/nb_size_2025.csv.gz"
+    predictions_path = PROJECT / "data/model_validation/nb_size_2025.csv.gz"
     pred = pd.read_csv(predictions_path, dtype={"building_id": str, "bbl": str})
     with duckdb.connect(str(PROJECT / "data/housing.duckdb"), read_only=True) as c:
-        annual = c.sql(
-            "SELECT building_id,year,complaints,problems,class_b,class_c,hazardous,calendar_months,source_coverage_present FROM analytical.annual ORDER BY building_id,year"
-        ).df()
-        features = c.sql(
-            "SELECT building_id,borough_id,selected_units,pluto_units,buildings_on_lot,unit_counts_comparable,unit_comparison,year_built,building_class,active_bin_records,active_hpd_buildings_on_lot,conflicting_events FROM analytical.features"
-        ).df()
-        quality = c.sql("""SELECT building_id,count(*) FILTER(WHERE bbl_conflict OR bin_conflict OR component_bbl_conflict OR source_bbl_conflict) geography_flagged_events,
-        count(*) FILTER(WHERE year(event_month)=2025 AND (bbl_conflict OR bin_conflict OR component_bbl_conflict OR source_bbl_conflict)) geography_flagged_2025
-        FROM audit.event_links WHERE in_study GROUP BY building_id""").df()
-        dates = c.sql(
-            "SELECT building_id,count(*) bad_approval_dates FROM clean.violations WHERE in_study AND approved_at<inspected_at GROUP BY building_id"
-        ).df()
-        complaints = c.sql("""SELECT building_id,count(*) FILTER(WHERE duplicate_flag='Y') duplicate_flagged_problems_2025,
-        count(DISTINCT received_at::DATE) complaint_reporting_days_2025
-        FROM clean.complaints WHERE in_study AND year(event_month)=2025 GROUP BY building_id""").df()
+        annual = c.sql("""
+            SELECT building_id, year, complaints, problems, class_b, class_c, hazardous,
+                   calendar_months, source_coverage_present
+            FROM analytical.annual
+            ORDER BY building_id, year
+        """).df()
+        features = c.sql("""
+            SELECT building_id, borough_id, selected_units, pluto_units, buildings_on_lot,
+                   unit_counts_comparable, unit_comparison, year_built, building_class,
+                   active_bin_records, active_hpd_buildings_on_lot, conflicting_events
+            FROM analytical.features
+        """).df()
+        quality = c.sql("""
+            SELECT building_id,
+                   count(*) FILTER (WHERE bbl_conflict OR bin_conflict
+                                    OR component_bbl_conflict OR source_bbl_conflict)
+                       AS geography_flagged_events,
+                   count(*) FILTER (WHERE year(event_month) = 2025
+                                    AND (bbl_conflict OR bin_conflict
+                                         OR component_bbl_conflict OR source_bbl_conflict))
+                       AS geography_flagged_2025
+            FROM audit.event_links
+            WHERE in_study
+            GROUP BY building_id
+        """).df()
+        dates = c.sql("""
+            SELECT building_id, count(*) AS bad_approval_dates
+            FROM clean.violations
+            WHERE in_study AND approved_at < inspected_at
+            GROUP BY building_id
+        """).df()
+        complaints = c.sql("""
+            SELECT building_id,
+                   count(*) FILTER (WHERE duplicate_flag = 'Y') AS duplicate_flagged_problems_2025,
+                   count(DISTINCT received_at::DATE) AS complaint_reporting_days_2025
+            FROM clean.complaints
+            WHERE in_study AND year(event_month) = 2025
+            GROUP BY building_id
+        """).df()
     current = annual[annual.year == 2025].merge(features, on="building_id", validate="one_to_one")
     if not current.source_coverage_present.all() or not (current.calendar_months == 12).all():
         raise ValueError("Unavailable observation time")
@@ -299,18 +324,20 @@ def main():
             {
                 "generated_at": now(),
                 "code_sha256": sha256(Path(__file__)),
-                "report_code_sha256": sha256(PROJECT / "housing/phase6_report.py"),
+                "report_code_sha256": sha256(PROJECT / "housing/leads_report.py"),
                 "plan_sha256": sha256(report / "selection_plan.json"),
                 "phase5_parameters_sha256": original_hash,
                 "phase5_predictions_sha256": sha256(predictions_path),
-                "phase5_decision_sha256": sha256(PROJECT / "reports/phase5/decision.json"),
+                "phase5_decision_sha256": sha256(
+                    PROJECT / "reports/model_validation/decision.json"
+                ),
             },
             indent=2,
         )
         + "\n"
     )
     assert original_hash == sha256(parameter_path)
-    from housing.phase6_report import write_report
+    from housing.leads_report import write_report
 
     write_report(report, summary, profiles, sensitivity)
     print(json.dumps(summary, indent=2), flush=True)

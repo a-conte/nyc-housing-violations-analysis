@@ -1,4 +1,7 @@
-"""Pre-2025 selection, frozen final evaluation: python -m housing.phase5."""
+"""Choose the final model on 2023-2024 validation years, then evaluate it once on 2025.
+
+Run with `python -m housing.model_validation`. Writes the Phase 5 report.
+"""
 
 import hashlib
 import json
@@ -11,9 +14,9 @@ import pandas as pd
 from scipy.optimize import minimize_scalar
 from scipy.stats import nbinom
 
+from housing.baseline_models import QUERY, design, fit, score, validate
 from housing.database import PROJECT
 from housing.download import now, sha256
-from housing.phase4 import QUERY, design, fit, score, validate
 
 MODELS = ("poisson", "nb2", "nb_size", "nb_size_flat", "poisson_size_nb_variance")
 PLAN = {
@@ -140,9 +143,9 @@ def bootstrap(out, previous):
 
 
 def main():
-    root = PROJECT / "reports/phase5"
+    root = PROJECT / "reports/model_validation"
     root.mkdir(parents=True, exist_ok=True)
-    local = PROJECT / "data/phase5"
+    local = PROJECT / "data/model_validation"
     local.mkdir(exist_ok=True)
     (root / "plan.json").write_text(json.dumps(PLAN, indent=2) + "\n")
     with duckdb.connect(str(PROJECT / "data/housing.duckdb"), read_only=True) as c:
@@ -274,7 +277,7 @@ def main():
             {
                 "generated_at": now(),
                 "code_sha256": sha256(Path(__file__)),
-                "phase4_code_sha256": sha256(PROJECT / "housing/phase4.py"),
+                "phase4_code_sha256": sha256(PROJECT / "housing/baseline_models.py"),
                 "lock_sha256": sha256(PROJECT / "uv.lock"),
                 "pre2025_input_sha256": hashlib.sha256(
                     pd.util.hash_pandas_object(pre, index=False).values.tobytes()
@@ -287,7 +290,7 @@ def main():
         )
         + "\n"
     )
-    from housing.phase5_report import write_report
+    from housing.validation_report import write_report
 
     write_report(root, validation, summary, trend, winner, intervals)
     print(summary.to_string(index=False), flush=True)

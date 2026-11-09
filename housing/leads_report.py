@@ -1,10 +1,38 @@
-# Phase 6: exploratory investigative analysis
+"""Render the exploratory Phase 6 evidence, with no model training."""
+
+from housing.database import markdown_table
+
+
+def write_report(root, s, profiles, sensitivity):
+    cols = [
+        "building_id",
+        "selected_units",
+        "class_b",
+        "class_c",
+        "rate",
+        "expected",
+        "oe",
+        "pearson_residual",
+    ]
+    context = [
+        "building_id",
+        "borough_id",
+        "pluto_units",
+        "buildings_on_lot",
+        "complaints",
+        "problems",
+        "years_with_bc",
+        "peer_n",
+        "peer_rate_p90",
+        "unit_comparison",
+    ]
+    (root / "README.md").write_text(f"""# Exploratory leads for review (Phase 6)
 
 **These are leads for record review, not findings of illegal conduct or wrongdoing.**
 This is retrospective prioritization of recorded activity, not validated statistical anomaly
 detection or evidence of investigative accuracy. No composite score is constructed.
 
-Reproduce with `uv run python -m housing.phase6`. The runner reads the existing Phase 3
+Reproduce with `uv run python -m housing.leads`. The runner reads the existing Phase 3
 cohort and saved Phase 5 `nb_size` predictions. It verifies saved expectations against
 frozen coefficients, checks cohort/observation/outcome alignment, and never calls a fit
 routine. No database or earlier model artifacts are modified. selection_plan.json and
@@ -14,14 +42,14 @@ owner names and contacts. They are not anonymized property identifiers.
 
 ## Scope and strongest findings
 
-The 2025 cohort has **145,832 buildings** and **571,613 B/C
-violations**. **3,934 buildings** meet the common review gates. The union
-of three queues contains **27 leads**, with **11,328 B/C violations**
-(1.98% of cohort B/C), **4,371 distinct
-complaints** and **8,516 complaint-problem rows**.
-**23 leads** had B/C activity in every year 2021–2024.
-**0 leads** have geographic-key conflicts somewhere in
-2021–2025 and **5** have disagreeing comparable unit counts.
+The 2025 cohort has **{s["cohort_buildings"]:,} buildings** and **{s["cohort_bc"]:,} B/C
+violations**. **{s["screen_eligible"]:,} buildings** meet the common review gates. The union
+of three queues contains **{s["leads"]} leads**, with **{s["lead_bc"]:,} B/C violations**
+({100 * s["lead_bc"] / s["cohort_bc"]:.2f}% of cohort B/C), **{s["lead_complaints"]:,} distinct
+complaints** and **{s["lead_problem_rows"]:,} complaint-problem rows**.
+**{s["leads_with_bc_all_prior_years"]} leads** had B/C activity in every year 2021–2024.
+**{s["leads_with_geography_flags"]} leads** have geographic-key conflicts somewhere in
+2021–2025 and **{s["leads_with_unit_disagreement"]}** have disagreeing comparable unit counts.
 These counts describe selected recorded burden, not verified physical defects or households.
 
 ## Transparent selection and exposure safeguards
@@ -63,21 +91,11 @@ residual among remaining leads, plus the highest raw-count remaining lead with a
 or linkage review flag. The same identifier tie-break applies. They illustrate selection and
 quality-review routes, not representative samples or the most problematic properties.
 
-| building_id | selected_units | class_b | class_c | rate | expected | oe | pearson_residual |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| 119209 | 16 | 202.00 | 170.00 | 2,325.00 | 18.21 | 20.43 | 5.39 |
-| 119895 | 169 | 352.00 | 333.00 | 405.33 | 35.22 | 19.45 | 5.12 |
-| 687226 | 175 | 562.00 | 241.00 | 458.86 | 11.82 | 67.95 | 18.54 |
-| 880929 | 114 | 638.00 | 333.00 | 851.75 | 30.08 | 32.28 | 8.68 |
+{markdown_table(cols, profiles[cols].itertuples(index=False, name=None))}
 
 Context and denominator review:
 
-| building_id | borough_id | pluto_units | buildings_on_lot | complaints | problems | years_with_bc | peer_n | peer_rate_p90 | unit_comparison |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 119209 | 2 | 16 | 1 | 57.00 | 196.00 | 4 | 3,936 | 285.71 | agreement |
-| 119895 | 2 | 170 | 2 | 816.00 | 950.00 | 4 | 723 | 100.00 | not_one_building_to_one_lot |
-| 687226 | 4 | 175 | 1 | 152.00 | 281.00 | 4 | 819 | 30.63 | agreement |
-| 880929 | 2 | 114 | 1 | 175.00 | 347.00 | 4 | 1,782 | 136.83 | agreement |
+{markdown_table(context, profiles[context].itertuples(index=False, name=None))}
 
 Borough codes: 1 Manhattan, 2 Bronx, 3 Brooklyn, 4 Queens, 5 Staten Island.
 The raw-count illustration is BuildingID 880929 (971 B/C); the rate illustration is
@@ -128,12 +146,7 @@ coverage is observed publication, not proof of complete reporting or historical 
 
 ## Selection sensitivity without changing the model
 
-| scenario | base_leads | scenario_leads | retained | removed | added | jaccard |
-| --- | --- | --- | --- | --- | --- | --- |
-| exclude_ambiguous | 27 | 27 | 23 | 4 | 4 | 0.74 |
-| comparable_HPD_vs_full | 27 | 26 | 21 | 6 | 5 | 0.66 |
-| comparable_PLUTO_vs_HPD | 26 | 26 | 25 | 1 | 1 | 0.93 |
-| agreement_only | 27 | 23 | 16 | 11 | 7 | 0.47 |
+{markdown_table(list(sensitivity.columns), sensitivity.itertuples(index=False, name=None))}
 
 - Exclude ambiguous links: remove any building with 2021–2025 geographic disagreements,
   shared active BIN or shared active HPD lot. Reapply the unchanged queues and report new
@@ -173,3 +186,4 @@ include cohort exclusions, zero-event definitions and review limitations; and di
 administrative building identity from a verified physical property. Verify consequential
 source records and exposure before interpreting any individual lead. No owner attribution,
 validated accuracy claim or formal anomaly classification is warranted. Phase 6 is complete; Phase 7 is outside this review.
+""")

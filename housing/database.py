@@ -15,13 +15,20 @@ from housing.sources import SOURCES, partitions
 PROJECT = Path(__file__).resolve().parent.parent
 
 
-def execute_sql(connection, directory=PROJECT / "sql"):
+def execute_sql(connection: duckdb.DuckDBPyConnection, directory: Path = PROJECT / "sql") -> None:
+    """Run the numbered SQL files (staging, linkage, metrics, audits, quality) in order."""
     for path in sorted(directory.glob("*.sql")):
         print(f"SQL {path.name}", flush=True)
         connection.execute(path.read_text())
 
 
-def verify_snapshot(root, config):
+def verify_snapshot(root: Path | str, config: dict) -> tuple[dict, list[dict]]:
+    """Check a downloaded snapshot before loading it.
+
+    Confirms that each partition matches its manifest: same query, row counts that
+    reconcile with the source, byte size, checksum, CSV header and readable gzip data.
+    Returns the run record and the list of partition manifests.
+    """
     root = Path(root)
     run = json.loads((root / "run.json").read_text())
     contract = {"study": config["study"], "sources": list(SOURCES)}
@@ -80,7 +87,10 @@ def verify_snapshot(root, config):
     return run, manifests
 
 
-def load_raw(connection, root, manifests, config):
+def load_raw(
+    connection: duckdb.DuckDBPyConnection, root: Path, manifests: list[dict], config: dict
+) -> None:
+    """Load every partition into raw.* tables as text, then confirm row counts per partition."""
     for schema in ("raw", "clean", "mart", "audit"):
         connection.execute(f"CREATE SCHEMA {schema}")
     connection.execute("CREATE TABLE run_config(start_date DATE, end_date DATE)")
@@ -123,7 +133,8 @@ def load_raw(connection, root, manifests, config):
         print(f"loaded {name}: {sum(actual.values()):,} rows", flush=True)
 
 
-def export_csv(connection, query, path):
+def export_csv(connection: duckdb.DuckDBPyConnection, query: str, path: Path) -> None:
+    """Write a query result to CSV with a header row."""
     cursor = connection.execute(query)
     with path.open("w", newline="") as stream:
         writer = csv.writer(stream)
@@ -131,7 +142,9 @@ def export_csv(connection, query, path):
         writer.writerows(cursor.fetchall())
 
 
-def markdown_table(headers, rows):
+def markdown_table(headers: list[str], rows) -> str:
+    """Format rows as a Markdown table with thousands separators."""
+
     def cell(value):
         if value is None:
             return "—"
@@ -150,7 +163,14 @@ def markdown_table(headers, rows):
     )
 
 
-def write_reports(connection, report_dir, run, manifests, config):
+def write_reports(
+    connection: duckdb.DuckDBPyConnection,
+    report_dir: Path,
+    run: dict,
+    manifests: list[dict],
+    config: dict,
+) -> None:
+    """Export the data-quality audit tables and write the Phase 2 report."""
     report_dir.mkdir(parents=True, exist_ok=True)
     exports = {
         "checks": "SELECT * FROM audit.checks ORDER BY severity, check_name",
@@ -235,7 +255,7 @@ def write_reports(connection, report_dir, run, manifests, config):
     """).fetchall()
     errors = [row for row in checks if row[1] == "error"]
     start, end = config["study"]["start_year"], config["study"]["end_year"]
-    body = f"""# Phase 2: extraction, validation, and linkage audit
+    body = f"""# Extraction, validation and linkage audit (Phase 2)
 
 Generated from the local frozen extracts completed at **{run["completed_at"]}**.
 Configured event window: **{start}–{end}**, using complaint receipt and violation inspection dates.
@@ -342,7 +362,14 @@ No model, subjective composite score, or formal statistical anomaly label is pro
     (report_dir / "README.md").write_text(body)
 
 
-def build_database(root, database, report_dir, config):
+def build_database(
+    root: Path | str, database: Path | str, report_dir: Path | str, config: dict
+) -> None:
+    """Build the DuckDB database from a verified snapshot.
+
+    Builds into a temporary file and only replaces the real database if every blocking
+    integrity check passes, so a failed build never leaves a half-finished database.
+    """
     root, database, report_dir = Path(root), Path(database), Path(report_dir)
     run, manifests = verify_snapshot(root, config)
     run = {

@@ -1,9 +1,10 @@
-"""Retrospective count baselines: python -m housing.phase4 (no source writes)."""
+"""Baseline count models for yearly B/C violations per building.
 
-import os
+Run with `python -m housing.baseline_models`. Reads the analytical tables (never writes to
+the database), fits Poisson and negative binomial (NB2) models on 2021-2024, scores 2025,
+and writes metrics, calibration tables and figures to reports/baseline_models.
+"""
 
-os.environ.setdefault("MPLCONFIGDIR", "/tmp/housing-matplotlib")
-os.environ.setdefault("XDG_CACHE_HOME", "/tmp/housing-cache")
 import json
 import platform
 from pathlib import Path
@@ -24,12 +25,16 @@ from statsmodels.discrete.discrete_model import NegativeBinomial
 from housing.database import PROJECT
 from housing.download import now, sha256
 
-QUERY = """SELECT a.building_id,a.year,a.complaints,a.class_b,a.class_c,a.hazardous,
- a.calendar_months,a.source_coverage_present,f.selected_units,f.pluto_units,
- f.unit_counts_comparable,f.agreement_sensitivity,f.year_built,f.borough_id,
- f.building_class,f.bbl
- FROM analytical.annual a JOIN analytical.features f USING(building_id)
- ORDER BY a.building_id,a.year"""
+# One row per cohort building per year: outcomes plus the building attributes used as controls.
+QUERY = """
+SELECT a.building_id, a.year, a.complaints, a.class_b, a.class_c, a.hazardous,
+       a.calendar_months, a.source_coverage_present,
+       f.selected_units, f.pluto_units, f.unit_counts_comparable, f.agreement_sensitivity,
+       f.year_built, f.borough_id, f.building_class, f.bbl
+FROM analytical.annual a
+JOIN analytical.features f USING (building_id)
+ORDER BY a.building_id, a.year
+"""
 NAMES = [
     "intercept",
     "log_units",
@@ -42,43 +47,57 @@ NAMES = [
 ]
 
 
-def validate(d):
-    if d.duplicated(["building_id", "year"]).any():
+def validate(panel: pd.DataFrame) -> None:
+    """Raise ValueError if the building-year panel breaks any modeling assumption."""
+    if panel.duplicated(["building_id", "year"]).any():
         raise ValueError("Duplicate building-year")
     for field in ["selected_units", "year_built", "borough_id", "hazardous", "class_b", "class_c"]:
-        if not np.isfinite(d[field]).all():
+        if not np.isfinite(panel[field]).all():
             raise ValueError(f"Invalid {field}")
-    if not ((d.selected_units > 0) & (d.calendar_months == 12) & d.source_coverage_present).all():
+    if not (
+        (panel.selected_units > 0) & (panel.calendar_months == 12) & panel.source_coverage_present
+    ).all():
         raise ValueError("Invalid or unavailable exposure")
     if not (
-        (d.hazardous >= 0)
-        & (d.hazardous == np.floor(d.hazardous))
-        & (d.hazardous == d.class_b + d.class_c)
+        (panel.hazardous >= 0)
+        & (panel.hazardous == np.floor(panel.hazardous))
+        & (panel.hazardous == panel.class_b + panel.class_c)
     ).all():
         raise ValueError("Invalid outcome")
-    if not d.borough_id.isin(range(1, 6)).all():
+    if not panel.borough_id.isin(range(1, 6)).all():
         raise ValueError("Unknown borough")
 
 
-def design(d):
+def design(panel: pd.DataFrame) -> np.ndarray:
+    """Build the predictor matrix: size, age, year trend and borough indicators."""
     # No complaint, status, persistence, identifier, or evaluation-outcome predictors.
     return np.column_stack(
         [
-            np.ones(len(d)),
-            np.log(d.selected_units),
-            (2021 - d.year_built) / 100,
-            (d.year - 2021),
-            *[(d.borough_id == k).astype(float) for k in range(2, 6)],
+            np.ones(len(panel)),
+            np.log(panel.selected_units),
+            (2021 - panel.year_built) / 100,
+            (panel.year - 2021),
+            *[(panel.borough_id == k).astype(float) for k in range(2, 6)],
         ]
     )
 
 
-def fit(d, family="poisson", denominator="selected_units", design_matrix=None):
-    exposure = d[denominator].to_numpy(float)
+def fit(
+    panel: pd.DataFrame,
+    family: str = "poisson",
+    denominator: str = "selected_units",
+    design_matrix: np.ndarray | None = None,
+) -> tuple[np.ndarray, float]:
+    """Fit a count model with log(apartments) as the exposure offset.
+
+    Returns (coefficients, alpha). alpha is the NB2 overdispersion parameter, or 0.0 for
+    Poisson. The Poisson fit also supplies starting values for NB2.
+    """
+    exposure = panel[denominator].to_numpy(float)
     if not np.isfinite(exposure).all() or (exposure <= 0).any():
         raise ValueError("Invalid exposure denominator")
-    x = design(d) if design_matrix is None else design_matrix
-    y = d.hazardous.to_numpy(float)
+    x = design(panel) if design_matrix is None else design_matrix
+    y = panel.hazardous.to_numpy(float)
     offset = np.log(exposure)
     p = sm.GLM(y, x, offset=offset, family=sm.families.Poisson()).fit(maxiter=100)
     if not p.converged:
@@ -97,15 +116,26 @@ def fit(d, family="poisson", denominator="selected_units", design_matrix=None):
     return result.params[:-1], float(result.params[-1])
 
 
-def score(d, beta, alpha, denominator="selected_units", design_matrix=None):
-    y = d.hazardous.to_numpy(float)
-    x = design(d) if design_matrix is None else design_matrix
-    mu = np.exp(x @ beta) * d[denominator].to_numpy(float)
+def score(
+    panel: pd.DataFrame,
+    beta: np.ndarray,
+    alpha: float,
+    denominator: str = "selected_units",
+    design_matrix: np.ndarray | None = None,
+) -> tuple[pd.DataFrame, dict]:
+    """Compare observed counts with model expectations.
+
+    Returns per-building expected counts, residuals and 95% count intervals, plus summary
+    metrics (aggregate observed/expected, likelihood, dispersion, interval coverage).
+    """
+    y = panel.hazardous.to_numpy(float)
+    x = design(panel) if design_matrix is None else design_matrix
+    mu = np.exp(x @ beta) * panel[denominator].to_numpy(float)
     if not np.isfinite(mu).all() or (mu <= 0).any():
         raise ValueError("Invalid predictions")
     variance = mu + alpha * mu**2
     distribution = poisson(mu) if alpha == 0 else nbinom(1 / alpha, 1 / (1 + alpha * mu))
-    out = d[["building_id", "year", "borough_id", "selected_units", "hazardous"]].copy()
+    out = panel[["building_id", "year", "borough_id", "selected_units", "hazardous"]].copy()
     out["expected"] = mu
     out["observed_minus_expected"] = y - mu
     out["oe"] = y / mu
@@ -114,7 +144,7 @@ def score(d, beta, alpha, denominator="selected_units", design_matrix=None):
     out["lower95"] = distribution.ppf(0.025)
     out["upper95"] = distribution.ppf(0.975)
     metrics = {
-        "n": len(d),
+        "n": len(panel),
         "observed": float(y.sum()),
         "expected": float(mu.sum()),
         "aggregate_oe": float(y.sum() / mu.sum()),
@@ -131,26 +161,32 @@ def score(d, beta, alpha, denominator="selected_units", design_matrix=None):
     return out, metrics
 
 
-def main():
-    report = PROJECT / "reports/phase4"
+def main() -> None:
+    """Fit all baseline and sensitivity models and write the Phase 4 report."""
+    report = PROJECT / "reports/baseline_models"
     report.mkdir(parents=True, exist_ok=True)
-    local = PROJECT / "data/phase4"
+    local = PROJECT / "data/baseline_models"
     local.mkdir(exist_ok=True)
     with duckdb.connect(str(PROJECT / "data/housing.duckdb"), read_only=True) as con:
-        d = con.sql(QUERY).df()
+        panel = con.sql(QUERY).df()
         # Linkage sensitivity selected solely using training-period events.
         conflict_ids = set(
             con.sql(
-                "SELECT DISTINCT building_id FROM audit.event_links WHERE in_study AND year(event_month)<=2024 AND (bbl_conflict OR bin_conflict OR component_bbl_conflict)"
+                """
+                SELECT DISTINCT building_id
+                FROM audit.event_links
+                WHERE in_study AND year(event_month) <= 2024
+                  AND (bbl_conflict OR bin_conflict OR component_bbl_conflict)
+                """
             ).fetchnumpy()["building_id"]
         )
-    validate(d)
+    validate(panel)
     if (
-        set(d.year) != {2021, 2022, 2023, 2024, 2025}
-        or not (d.groupby("building_id").size() == 5).all()
+        set(panel.year) != {2021, 2022, 2023, 2024, 2025}
+        or not (panel.groupby("building_id").size() == 5).all()
     ):
         raise ValueError("Expected complete 2021–2025 panel")
-    annual = d.groupby("year").agg(
+    annual = panel.groupby("year").agg(
         buildings=("building_id", "size"),
         complaints=("complaints", "sum"),
         class_b=("class_b", "sum"),
@@ -162,7 +198,7 @@ def main():
     annual["variance_mean_ratio"] = annual.variance / annual["mean"]
     annual.to_csv(report / "annual_eda.csv")
     desc = (
-        d.assign(rate=100 * d.hazardous / d.selected_units)[
+        panel.assign(rate=100 * panel.hazardous / panel.selected_units)[
             ["selected_units", "complaints", "class_b", "class_c", "hazardous", "rate"]
         ]
         .describe(percentiles=[0.5, 0.9, 0.95, 0.99])
@@ -170,37 +206,37 @@ def main():
     )
     desc.to_csv(report / "distributions.csv")
     for key in ["borough_id", "building_class"]:
-        d.groupby(key).agg(
+        panel.groupby(key).agg(
             rows=("hazardous", "size"),
             mean=("hazardous", "mean"),
             variance=("hazardous", "var"),
             units=("selected_units", "sum"),
             violations=("hazardous", "sum"),
         ).assign(rate=lambda x: 100 * x.violations / x.units).to_csv(report / f"eda_{key}.csv")
-    train = d[d.year <= 2024]
+    train = panel[panel.year <= 2024]
     metrics = []
     coefficients = []
     outputs = {}
     calibrations = []
-    configs = [("poisson", d, 2021, "selected_units", "poisson")]
+    configs = [("poisson", panel, 2021, "selected_units", "poisson")]
     # NB justified using training dispersion, never evaluation performance.
     beta, alpha = fit(train)
     _, diagnostic = score(train, beta, alpha)
     if diagnostic["pearson_dispersion"] > 1.5:
-        comparable = d[d.unit_counts_comparable & (d.pluto_units > 0)]
+        comparable = panel[panel.unit_counts_comparable & (panel.pluto_units > 0)]
         configs += [
-            ("nb2", d, 2021, "selected_units", "nb2"),
+            ("nb2", panel, 2021, "selected_units", "nb2"),
             ("comparable_hpd", comparable, 2021, "selected_units", "nb2"),
             ("comparable_pluto", comparable, 2021, "pluto_units", "nb2"),
-            ("agreement", d[d.agreement_sensitivity], 2021, "selected_units", "nb2"),
+            ("agreement", panel[panel.agreement_sensitivity], 2021, "selected_units", "nb2"),
             (
                 "training_linkage_clean",
-                d[~d.building_id.isin(conflict_ids)],
+                panel[~panel.building_id.isin(conflict_ids)],
                 2021,
                 "selected_units",
                 "nb2",
             ),
-            ("exclude_2021", d, 2022, "selected_units", "nb2"),
+            ("exclude_2021", panel, 2022, "selected_units", "nb2"),
         ]
     for name, subset, start, denominator, family in configs:
         tr = subset[(subset.year >= start) & (subset.year <= 2024)]
@@ -278,7 +314,7 @@ def main():
         ],
         strict=True,
     ):
-        vals = d[col] if col != "rate" else 100 * d.hazardous / d.selected_units
+        vals = panel[col] if col != "rate" else 100 * panel.hazardous / panel.selected_units
         ax.hist(np.log1p(vals), bins=60, color="#287890")
         ax.set(xlabel=f"log(1 + {label})", ylabel="Building-years")
     fig.tight_layout()
@@ -334,17 +370,17 @@ def main():
         "statsmodels": sm.__version__,
         "sql": QUERY,
         "input_sha256": __import__("hashlib")
-        .sha256(pd.util.hash_pandas_object(d, index=False).values.tobytes())
+        .sha256(pd.util.hash_pandas_object(panel, index=False).values.tobytes())
         .hexdigest(),
         "code_sha256": sha256(Path(__file__)),
-        "report_code_sha256": sha256(PROJECT / "housing/phase4_report.py"),
+        "report_code_sha256": sha256(PROJECT / "housing/baseline_report.py"),
         "lock_sha256": sha256(PROJECT / "uv.lock"),
         "training_years": [2021, 2022, 2023, 2024],
         "evaluation_year": 2025,
         "predictors": NAMES,
     }
     (report / "provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
-    from housing.phase4_report import write_report
+    from housing.baseline_report import write_report
 
     write_report(report)
     print(m.to_string(index=False), flush=True)

@@ -1,45 +1,6 @@
-"""Computed Phase 5 report; selection is frozen before final evaluation."""
+# Calibration and temporal validation (Phase 5)
 
-import json
-
-import pandas as pd
-
-from housing.database import markdown_table
-
-
-def write_report(root, validation, summary, trend, winner, intervals):
-    means = (
-        validation.groupby("model")[
-            [
-                "calibration_loss",
-                "aggregate_oe",
-                "mean_negative_log_likelihood",
-                "predicted_zero_fraction",
-                "interval95_coverage",
-            ]
-        ]
-        .mean()
-        .reset_index()
-    )
-    columns = [
-        "model",
-        "aggregate_oe",
-        "mean_negative_log_likelihood",
-        "mae",
-        "observed_zero_fraction",
-        "predicted_zero_fraction",
-        "interval95_coverage",
-    ]
-    final = summary[summary.model == winner].iloc[0]
-    g = pd.read_csv(root / "final_groups.csv")
-    g = g[(g.model == winner) & g.group_type.isin(["size_band", "borough_id", "history"])][
-        ["group_type", "group", "n", "oe"]
-    ]
-    b = json.loads((root / "parameters.json").read_text())[winner]["coefficients"]
-    elasticity = [1 + b[1], 1 + b[1] + b[8], 1 + b[1] + b[8] + b[9]] if len(b) == 10 else [1 + b[1]]
-    (root / "README.md").write_text(f"""# Phase 5: calibration and temporal validation
-
-Run `OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 uv run python -m housing.phase5`.
+Run `OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 uv run python -m housing.model_validation`.
 Existing Phase 3 tables and Phase 4 fitting/scoring are reused. No source data or analytical
 tables are changed; no rankings, owner analysis or anomaly thresholds are produced.
 
@@ -50,9 +11,15 @@ exposure are explicitly checked for equality. Thus the recorded rate changes can
 explained by measured composition or denominator changes within this cohort. This does not
 establish unchanged actual occupancy or physical capacity: attributes are current snapshots.
 
-{markdown_table(["year", *trend.columns], trend.reset_index().itertuples(index=False, name=None))}
+| year | buildings | apartments | violations | rate_per_100 | change |
+| --- | --- | --- | --- | --- | --- |
+| 2,021 | 145,832 | 2,255,098 | 409,527.00 | 18.16 | nan |
+| 2,022 | 145,832 | 2,255,098 | 423,518.00 | 18.78 | 0.03 |
+| 2,023 | 145,832 | 2,255,098 | 512,175.00 | 22.71 | 0.21 |
+| 2,024 | 145,832 | 2,255,098 | 617,873.00 | 27.40 | 0.21 |
+| 2,025 | 145,832 | 2,255,098 | 571,613.00 | 25.35 | -0.07 |
 
-2025 B/C rate changes by **{trend.loc[2025, "change"]:.2%}** relative to 2024, reversing the
+2025 B/C rate changes by **-7.49%** relative to 2024, reversing the
 preceding growth. That is a practically relevant descriptive shift in recorded activity,
 not proof of a change in underlying conditions, enforcement policy, or reporting completeness.
 `temporal_composition.csv` separates size and borough changes with fixed capacity exposure.
@@ -95,19 +62,29 @@ large-building observations warrant caution. No assumption of actual occupied-un
 
 ## Pre-2025 comparisons and frozen decision
 
-{markdown_table(list(means.columns), means.itertuples(index=False, name=None))}
+| model | calibration_loss | aggregate_oe | mean_negative_log_likelihood | predicted_zero_fraction | interval95_coverage |
+| --- | --- | --- | --- | --- | --- |
+| nb2 | 0.64 | 0.77 | 1.18 | 0.81 | 0.98 |
+| nb_size | 0.22 | 1.12 | 1.17 | 0.81 | 0.98 |
+| nb_size_flat | 0.40 | 1.22 | 1.17 | 0.81 | 0.98 |
+| poisson | 0.39 | 1.13 | 6.33 | 0.29 | 0.80 |
+| poisson_size_nb_variance | 0.26 | 1.13 | 1.18 | 0.81 | 0.98 |
 
-Selected **{winner}**, then refitted through 2024. Full fold metrics and group results are
+Selected **nb_size**, then refitted through 2024. Full fold metrics and group results are
 in `validation_models.csv` and `validation_groups.csv`; averaged O/E values above do not
 replace those individual fold results. 2025 results do not trigger reselection.
 
 ## Final retrospective evaluation
 
-{markdown_table(columns, summary[columns].itertuples(index=False, name=None))}
+| model | aggregate_oe | mean_negative_log_likelihood | mae | observed_zero_fraction | predicted_zero_fraction | interval95_coverage |
+| --- | --- | --- | --- | --- | --- | --- |
+| poisson | 0.82 | 6.47 | 5.69 | 0.81 | 0.22 | 0.76 |
+| nb2 | 0.62 | 1.17 | 6.90 | 0.81 | 0.80 | 0.98 |
+| nb_size | 0.93 | 1.17 | 5.14 | 0.81 | 0.79 | 0.98 |
 
-Selected-model O/E is **{final.aggregate_oe:.3f}**; observed zero fraction
-**{final.observed_zero_fraction:.2%}**, predicted **{final.predicted_zero_fraction:.2%}**;
-conditional 95% count-interval coverage is **{final.interval95_coverage:.2%}**.
+Selected-model O/E is **0.932**; observed zero fraction
+**80.58%**, predicted **79.47%**;
+conditional 95% count-interval coverage is **98.37%**.
 Lower negative log likelihood/MAE are better, but mean calibration and distributional
 calibration are distinct. A mean improvement alone does not validate tails or zeros.
 
@@ -115,26 +92,39 @@ calibration are distinct. A mean improvement alone does not validate tails or ze
 
 `final_groups.csv` records O/E by borough, size band, size quantile and prior mean annual
 violations (zero, 0–5, 5–20, 20+). Historical strata use only the preceding training years.
-{markdown_table(list(g.columns), g.itertuples(index=False, name=None))}
+| group_type | group | n | oe |
+| --- | --- | --- | --- |
+| size_band | 10–49 | 28,026 | 0.87 |
+| size_band | 3–9 | 107,500 | 0.89 |
+| size_band | 50+ | 10,306 | 1.04 |
+| borough_id | 1 | 25,475 | 0.87 |
+| borough_id | 2 | 19,602 | 0.94 |
+| borough_id | 3 | 67,605 | 0.96 |
+| borough_id | 4 | 31,826 | 0.89 |
+| borough_id | 5 | 1,324 | 1.27 |
+| history | 0–5 | 29,406 | 0.44 |
+| history | 20+ | 6,303 | 2.60 |
+| history | 5–20 | 11,901 | 1.01 |
+| history | zero | 98,222 | 0.15 |
 
 The size adjustment substantially reduces the original large-building overprediction.
 Historical-activity calibration remains poor: a peer baseline does not predict each
 building's persistent history. These strata are essential context for any future screening,
 not evidence that high-history buildings are independently significant outliers.
-Estimated count elasticities across size segments are **{[round(x, 3) for x in elasticity]}**.
+Estimated count elasticities across size segments are **[2.074, 0.857, -0.092]**.
 The largest-size segment is approximately flat rather than proportional to apartments;
 this is an association in the current cohort and should not be extrapolated beyond support.
 The log-scale size diagnostic omits zero-rate dots; the CSV retains every group.
 Size quantile edges are learned from unique training buildings; tied apartment counts
 collapse quantile bins rather than arbitrarily splitting identical sizes into ten groups.
-Local outputs `data/phase5/*_2025.csv.gz` contain residual diagnostics, not priority ranks.
+Local outputs `data/model_validation/*_2025.csv.gz` contain residual diagnostics, not priority ranks.
 
 ## Uncertainty and readiness
 
 A paired **BBL cluster bootstrap**, 300 draws with fixed seed 501, resamples complete lots.
 It preserves dependence within each lot and pairs 2024/2025 outcomes. Selected model
-aggregate O/E descriptive bootstrap interval: **{intervals[winner]["aggregate_oe"]}**.
-Paired year-over-year rate-change interval: **{intervals[winner]["year_over_year_change"]}**.
+aggregate O/E descriptive bootstrap interval: **[0.9082694428514977, 0.9570988619478604]**.
+Paired year-over-year rate-change interval: **[-0.09195339603452977, -0.05586684835496341]**.
 See `uncertainty.json` for both references as well.
 
 These intervals quantify empirical between-lot variability conditional on the fitted model
@@ -161,4 +151,3 @@ can be inferred from a statistical deviation. Stop after Phase 5.
 Tests cover pre-2025 selection guards, predictors, temporal caps, exposure identities,
 bootstrap reproducibility, and output integrity. Provenance and selected coefficients are
 retained alongside the reports; run `python -m pytest -q` and `python -m ruff check housing tests`.
-""")

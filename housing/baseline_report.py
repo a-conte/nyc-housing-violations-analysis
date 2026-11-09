@@ -1,7 +1,32 @@
-# Phase 4: exploratory analysis and count baselines
+"""Render the Phase 4 report from computed aggregate artifacts."""
+
+import pandas as pd
+
+from housing.database import markdown_table
+
+
+def write_report(report):
+    metrics = pd.read_csv(report / "model_metrics.csv")
+    annual = pd.read_csv(report / "annual_eda.csv")
+    sensitivity = pd.read_csv(report / "sensitivity.csv")
+    evaluation = metrics[metrics.period == "evaluation"]
+    columns = [
+        "model",
+        "n",
+        "aggregate_oe",
+        "mean_negative_log_likelihood",
+        "mae",
+        "interval95_coverage",
+        "predicted_zero_fraction",
+    ]
+    table = markdown_table(columns, evaluation[columns].itertuples(index=False, name=None))
+    training = metrics[(metrics.model == "poisson") & (metrics.period == "training")].iloc[0]
+    nb = metrics[(metrics.model == "nb2") & (metrics.period == "training")]
+    dispersion = "Not fitted" if nb.empty else f"{nb.iloc[0].alpha:.3f}"
+    (report / "README.md").write_text(f"""# Exploratory analysis and count baselines (Phase 4)
 
 Reproduce from the repository root with `uv sync --locked` and
-`OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 uv run python -m housing.phase4`.
+`OPENBLAS_NUM_THREADS=1 VECLIB_MAXIMUM_THREADS=1 uv run python -m housing.baseline_models`.
 The runner reads existing DuckDB tables without changing them. No source downloads,
 Isolation Forest, owner analysis, dashboards, or investigative rankings were added.
 
@@ -12,9 +37,9 @@ Median apartment capacity is 4; the 99th percentile is 173 and the maximum is 1,
 Annual B/C counts have median zero, pooled 99th percentile 69, and maximum 1,092.
 The pooled annual rate has 99th percentile 433.33 B/C per 100 capacity-unit-years.
 Counts are highly concentrated: annual zero-B/C fractions range from
-80.1% to 82.9%, while annual
-variance/mean ratios range from 60.8 to
-93.0. These marginal ratios are descriptive; conditional
+{annual.zero_fraction.min():.1%} to {annual.zero_fraction.max():.1%}, while annual
+variance/mean ratios range from {annual.variance_mean_ratio.min():.1f} to
+{annual.variance_mean_ratio.max():.1f}. These marginal ratios are descriptive; conditional
 Poisson dispersion, below, determines the NB comparison.
 
 ![Distributions](distributions.png)
@@ -52,9 +77,9 @@ Only size, age, borough and time are modeled. Fine property classes/stories are 
 left for later specification review rather than introducing many sparse parameters.
 No building IDs or contemporaneous complaints are controls.
 
-Poisson uses a log-link GLM. Training Pearson dispersion is **33.37**,
+Poisson uses a log-link GLM. Training Pearson dispersion is **{training.pearson_dispersion:.2f}**,
 well above the declared 1.5 diagnostic trigger. Accordingly, fit NB2 by maximum likelihood,
-with variance mu + alpha*mu² and jointly estimated **alpha = 13.459**. Every fit must
+with variance mu + alpha*mu² and jointly estimated **alpha = {dispersion}**. Every fit must
 converge and all predictions must be finite and positive. Coefficients and alpha are saved
 in coefficients.csv. Implementation follows the official
 [Statsmodels GLM documentation](https://www.statsmodels.org/stable/glm.html) and
@@ -76,15 +101,7 @@ is not solely the 2025 trend reversal. NB2's 98.28% interval coverage is conserv
 while Poisson covers only 75.66%. NB2 MAE worsens from 5.69 to 6.90. Improvements
 in distributional likelihood therefore do not establish superior mean prediction.
 
-| model | n | aggregate_oe | mean_negative_log_likelihood | mae | interval95_coverage | predicted_zero_fraction |
-| --- | --- | --- | --- | --- | --- | --- |
-| poisson | 145,832 | 0.82 | 6.47 | 5.69 | 0.76 | 0.22 |
-| nb2 | 145,832 | 0.62 | 1.17 | 6.90 | 0.98 | 0.80 |
-| comparable_hpd | 120,570 | 0.64 | 1.22 | 7.04 | 0.98 | 0.79 |
-| comparable_pluto | 120,570 | 0.64 | 1.22 | 7.03 | 0.98 | 0.79 |
-| agreement | 94,728 | 0.62 | 1.10 | 6.06 | 0.98 | 0.81 |
-| training_linkage_clean | 144,686 | 0.61 | 1.17 | 6.97 | 0.98 | 0.80 |
-| exclude_2021 | 145,832 | 0.60 | 1.17 | 7.05 | 0.98 | 0.79 |
+{table}
 
 Negative log likelihood and MAE are lower-is-better. Aggregate O/E should be near one.
 The 95% intervals are discrete equal-tail count intervals; nominal coverage need not be
@@ -101,7 +118,7 @@ scaling to show both tails without deleting extreme rows. calibration.csv gives 
 size-band and expected-decile observed/expected means and residual means. Broad population
 calibration can conceal poor calibration in particular groups or the upper tail.
 
-Building-level evaluation files are stored locally under `data/phase4/*_2025.csv.gz`, ordered
+Building-level evaluation files are stored locally under `data/baseline_models/*_2025.csv.gz`, ordered
 by BuildingID rather than a priority score. They contain observed and expected counts,
 O/E, observed-minus-expected, Pearson residuals, conditional intervals and an expected<1
 flag. O/E is not a ranking or significance statistic. Large ratios at tiny expectations
@@ -121,15 +138,7 @@ All variants are refitted only on their designated training rows:
   Shared active BINs were already excluded by Phase 3. No rematching is attempted.
 - Window: train on 2022–2024 instead of 2021–2024; retain the same 2025 target.
 
-| model | common_buildings | expected_spearman | median_expected_ratio | residual_spearman |
-| --- | --- | --- | --- | --- |
-| poisson | 145,832 | 0.94 | 1.53 | 0.81 |
-| nb2 | 145,832 | 1.00 | 1.00 | 1.00 |
-| comparable_hpd | 120,570 | 1.00 | 1.02 | 1.00 |
-| comparable_pluto | 120,570 | 0.98 | 1.04 | 0.98 |
-| agreement | 94,728 | 1.00 | 1.00 | 1.00 |
-| training_linkage_clean | 144,686 | 1.00 | 1.00 | 1.00 |
-| exclude_2021 | 145,832 | 1.00 | 1.00 | 1.00 |
+{markdown_table(list(sensitivity.columns), sensitivity.itertuples(index=False, name=None))}
 
 The CSV above summarizes common-building expected-count and residual Spearman correlations
 and median expected ratios; it is not a final ranking. sensitivity.csv contains the full
@@ -164,3 +173,4 @@ outcomes, deterministic fitting, output identities and NB dispersion estimation.
 `python -m pytest -q` and `python -m ruff check housing tests`. provenance.json records the
 input query/hash, code and dependency lock hashes, software versions and observation windows.
 The database and source files are unchanged. Phase 4 stops at baselines and diagnostics.
+""")

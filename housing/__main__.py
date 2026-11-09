@@ -11,7 +11,7 @@ def main():
     parser.add_argument("--config", type=Path, default=Path("config.toml"))
     parser.add_argument("--snapshot", type=Path, default=Path("data/snapshot"))
     parser.add_argument("--database", type=Path, default=Path("data/housing.duckdb"))
-    parser.add_argument("--report-dir", type=Path, default=Path("reports/phase2"))
+    parser.add_argument("--report-dir", type=Path, default=Path("reports/data_quality"))
     args = parser.parse_args()
     config = tomllib.loads(args.config.read_text())
     start, end = config["study"]["start_year"], config["study"]["end_year"]

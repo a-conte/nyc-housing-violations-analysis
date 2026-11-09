@@ -9,18 +9,18 @@ import pandas as pd
 import pytest
 
 from housing.download import sha256
-from housing.phase5 import matrix
-from housing.phase6 import PLAN, choose, overlap, peer_summary
-from housing.phase6_report import write_report
+from housing.leads import PLAN, choose, overlap, peer_summary
+from housing.leads_report import write_report
+from housing.model_validation import matrix
 
 ROOT = Path(__file__).resolve().parents[1]
-REPORT = ROOT / "reports/phase6"
+REPORT = ROOT / "reports/leads"
 
 
 @pytest.fixture(scope="module")
 def outputs():
     database = ROOT / "data/housing.duckdb"
-    snapshot = ROOT / "data/phase6/all_buildings_2025.csv.gz"
+    snapshot = ROOT / "data/leads/all_buildings_2025.csv.gz"
     if not database.exists() or not snapshot.exists():
         pytest.skip("Local analytical database and Phase 6 snapshot required")
     d = pd.read_csv(snapshot, dtype={"building_id": str})
@@ -65,7 +65,9 @@ def test_saved_cohort_and_frozen_model(outputs):
     np.testing.assert_array_equal(annual.hazardous, annual.class_b + annual.class_c)
     assert d.building_id.is_unique and d.source_coverage_present.all()
     assert (d.calendar_months == 12).all()
-    pred = pd.read_csv(ROOT / "data/phase5/nb_size_2025.csv.gz", dtype={"building_id": str})
+    pred = pd.read_csv(
+        ROOT / "data/model_validation/nb_size_2025.csv.gz", dtype={"building_id": str}
+    )
     cols = [
         "building_id",
         "hazardous",
@@ -75,7 +77,7 @@ def test_saved_cohort_and_frozen_model(outputs):
         "observed_minus_expected",
     ]
     equal(pred[cols], d)
-    params = json.loads((ROOT / "reports/phase5/parameters.json").read_text())["nb_size"]
+    params = json.loads((ROOT / "reports/model_validation/parameters.json").read_text())["nb_size"]
     mu = np.exp(matrix(d, "nb_size", 2024) @ np.array(params["coefficients"])) * d.selected_units
     np.testing.assert_allclose(mu, d.expected, rtol=1e-10)
     np.testing.assert_allclose(d.oe, d.hazardous / mu)
@@ -164,12 +166,12 @@ def test_report_and_provenance(tmp_path):
     assert json.loads((REPORT / "selection_plan.json").read_text()) == PLAN
     provenance = json.loads((REPORT / "provenance.json").read_text())
     for key, path in {
-        "code_sha256": "housing/phase6.py",
-        "report_code_sha256": "housing/phase6_report.py",
-        "plan_sha256": "reports/phase6/selection_plan.json",
-        "phase5_parameters_sha256": "reports/phase5/parameters.json",
-        "phase5_decision_sha256": "reports/phase5/decision.json",
-        "phase5_predictions_sha256": "data/phase5/nb_size_2025.csv.gz",
+        "code_sha256": "housing/leads.py",
+        "report_code_sha256": "housing/leads_report.py",
+        "plan_sha256": "reports/leads/selection_plan.json",
+        "phase5_parameters_sha256": "reports/model_validation/parameters.json",
+        "phase5_decision_sha256": "reports/model_validation/decision.json",
+        "phase5_predictions_sha256": "data/model_validation/nb_size_2025.csv.gz",
     }.items():
         if (ROOT / path).exists():
             assert provenance[key] == sha256(ROOT / path)
