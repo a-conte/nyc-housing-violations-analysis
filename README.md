@@ -1,6 +1,6 @@
 # NYC Housing Anomaly Analysis
 
-[![CI](https://github.com/a-conte/nyc-housing-anomaly-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/a-conte/nyc-housing-anomaly-analysis/actions/workflows/ci.yml)
+[![CI](https://github.com/a-conte/nyc-housing-anomaly-analysis/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/a-conte/nyc-housing-anomaly-analysis/actions/workflows/ci.yml)
 
 **Which New York City apartment buildings have far more serious housing violations than
 similar buildings, and should get a closer look?**
