@@ -176,15 +176,25 @@ checked by hand. This analysis does not show wrongdoing, ongoing defects or what
 
 ## Guide to the code
 
+**ETL**
+
 | Step | Where to look |
 | --- | --- |
 | Download and verify data | [housing/download.py](housing/download.py), [housing/sources.py](housing/sources.py) |
-| Load into DuckDB and run checks | [housing/database.py](housing/database.py), [sql/](sql/) |
+| Load into DuckDB and clean | [housing/database.py](housing/database.py), [sql/01_staging.sql](sql/01_staging.sql) |
 | Link records across IDs | [sql/02_linkage.sql](sql/02_linkage.sql) |
+| Build monthly and yearly counts | [sql/03_metrics.sql](sql/03_metrics.sql) |
+| Run integrity and quality checks | [sql/04_audits.sql](sql/04_audits.sql), [sql/05_quality.sql](sql/05_quality.sql) |
 | Build the comparison group and features | [sql/cohort/features.sql](sql/cohort/features.sql), [housing/cohort.py](housing/cohort.py) |
+
+**Analysis**
+
+| Step | Where to look |
+| --- | --- |
 | Fit and test the models | [housing/baseline_models.py](housing/baseline_models.py), [housing/model_validation.py](housing/model_validation.py) |
 | Select the 27 buildings | [housing/leads.py](housing/leads.py) |
-| Tests | [tests/](tests/) |
+
+Tests for both parts are in [tests/](tests/).
 
 The [reports/](reports/) folder holds the saved results of each stage, in the order the work
 was done:
