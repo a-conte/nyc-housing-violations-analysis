@@ -46,8 +46,9 @@ The project downloads four public datasets from [NYC Open Data](https://opendata
 | [HPD buildings](https://data.cityofnewyork.us/d/kj4p-ruqc) | Each building's ID and number of apartments |
 | [PLUTO](https://data.cityofnewyork.us/d/64uk-42ks) | Property details, like the year built |
 
-The downloader checks its own work. It counts the rows in each dataset before and after
-downloading and stops if anything went missing. It also saves a fingerprint (a SHA-256
+The downloader checks its own work. It compares downloaded row counts with source counts
+before and after downloading and stops if they differ. These checks cannot detect every
+change to a live source. It also saves a fingerprint (a SHA-256
 checksum) of every file, so later steps can prove they used the exact same data.
 
 ### 2. Clean and link the records
@@ -55,7 +56,7 @@ checksum) of every file, so later steps can prove they used the exact same data.
 The datasets are loaded into a [DuckDB](https://duckdb.org/) database and cleaned with SQL.
 Linking a violation to the right building is harder than it sounds: the city uses three
 different IDs (building ID, tax lot and building number) that don't always agree. The SQL
-flags every mismatch instead of guessing. A set of 17 automatic checks must all pass before
+flags detected mismatches instead of guessing. A set of 17 automatic checks must all pass before
 the database is used.
 
 ### 3. Pick a fair comparison group
@@ -64,16 +65,20 @@ To compare like with like, the study keeps only buildings that:
 
 - have at least 3 apartments and are not public housing (NYCHA),
 - were built before 2021 and not majorly altered since, and
-- have clean IDs that link to exactly one building.
+- have valid building, tax-lot and building-number IDs, with no shared active building number
+  (BIN), and a matching PLUTO property record with positive residential units and area.
 
 This leaves 145,832 buildings. Buildings with zero violations stay in, because they are part of
-"normal".
+"normal". Shared tax lots and conflicting event IDs can still occur; they are flagged and
+examined in sensitivity checks rather than treated as verified matches.
 
 ### 4. Predict how many violations each building "should" have
 
 Bigger buildings naturally get more violations, so raw counts aren't fair. A statistical
 model predicts each building's expected number of serious violations from its number of
-apartments, age, borough and year. The model learns from 2021–2024 and is then tested on 2025.
+apartments, age, borough and year. The model learns from 2021–2024 and is evaluated on 2025.
+Because 2025 had already been examined during earlier model development, this is a
+retrospective evaluation, not an untouched test of future performance.
 
 Violations are very uneven: about 80% of buildings have none in a given year, while a few
 have hundreds. A basic Poisson model can't handle that spread, so the project uses a
@@ -96,30 +101,46 @@ There is no secret combined score; every building's reason for selection is list
 
 ## Is the result reliable?
 
-**The model gets the overall picture right.** Across all buildings, actual 2025 violations
-were 93% of what the model predicted, and 98% of buildings fell inside the model's 95% range.
+**Aggregate fit improved, but the screening accuracy is unvalidated.** Across all buildings,
+actual 2025 violations were 93% of what the model predicted, and 98.4% of buildings fell
+inside its nominal 95% count intervals. These are useful overall diagnostics; they do not
+establish that the model reliably identifies unusually high counts or useful investigative
+leads. The intervals also condition on the fitted model and omit uncertainty in its
+parameters, record linkage and apartment counts.
 
 **It struggles with history.** Buildings with a long record of violations got about 2.6 times
 more than predicted, and buildings with no history got far fewer. A building's past matters
 more than size and age alone can capture.
 
-**The flagged list holds up when the rules change:**
+**Sensitivity depends on which assumption changes.** Restricting the eligible population
+can change the list substantially. Changing the apartment-count source within the same
+comparable population has a smaller effect:
 
-| If we… | Buildings that stayed flagged |
-| --- | --- |
-| drop buildings whose IDs are uncertain | 23 of 27 |
-| count apartments using PLUTO instead of HPD records (only buildings where both counts exist) | 25 of 26 |
-| keep only buildings where both sources agree on apartment count | 16 of 27 |
+| Scenario | Comparison list | Leads retained | Total scenario leads |
+| --- | --- | --- | --- |
+| Exclude ambiguous links, including shared active HPD tax lots | Original 27 leads | 23 of 27 | 27 |
+| Restrict to comparable one-building/one-lot properties, keeping HPD apartment counts | Original 27 leads | 21 of 27 | 26 |
+| Within that same comparable population, switch rate and apartment-size gates to PLUTO counts | 26 comparable-population HPD leads | 25 of 26 | 26 |
+| Restrict to comparable properties where HPD and PLUTO apartment counts agree | Original 27 leads | 16 of 27 | 23 |
+
+The **25-of-26** result is not retention of the original 27 leads. All scenarios keep the
+model's expected counts and residuals fixed; the PLUTO switch tests rate-based selection,
+not a refitted model. Queues are replenished after each restriction, so scenarios can add
+new leads. See the [full sensitivity analysis](reports/leads/README.md#selection-sensitivity-without-changing-the-model).
 
 ## What this can't tell you
 
-- **Violations measure inspections, not just conditions.** A violation only exists if
-  someone complained and an inspector came. Buildings where tenants report less may look
-  better than they are.
+- **Violations measure recorded inspection findings, not just conditions.** The analysis
+  does not measure how often each building was inspected. Differences in reporting and
+  inspection activity can affect the counts, so buildings where tenants report less may
+  look better than they are.
 - **The apartment counts are today's.** A building's size in 2021 may have been different.
 - **The selection rules were chosen after seeing 2025.** They keep the list to a reviewable
   size; they are not proven cutoffs.
 - **Linking records is imperfect.** Some violations may be attached to the wrong building.
+- **Lead usefulness has not been established by manual source-record review.** Automated
+  checks reconcile the outputs to the retained data; they do not establish how many leads
+  would warrant further investigation.
 
 Before anyone acted on these results, each building's records and identity would need to be
 checked by hand. This analysis does not show wrongdoing, ongoing defects or what caused them.
@@ -170,7 +191,8 @@ checked by hand. This analysis does not show wrongdoing, ongoing defects or what
   overdispersion (Pearson dispersion 33.37).
 - Model chosen by rolling validation (2021–22 → 2023, 2021–23 → 2024). The winner adds
   piecewise size terms with knots at 10 and 50 apartments. It is refit on 2021–2024 and
-  evaluated once on 2025.
+  evaluated retrospectively on 2025, which had already been inspected in the baseline
+  analysis. Model selection uses the earlier folds; 2025 is not an untouched holdout.
 - Diagnostics: calibration by size, borough and history; 95% count-interval coverage;
   and a 300-replicate bootstrap that resamples tax lots.
 - Leads come from three separate top-10 lists (count, rate, Pearson residual) instead
@@ -224,9 +246,14 @@ uv sync --locked
 uv run python -m pytest -q
 ```
 
-This runs 44 tests. Four of them compare against the full local dataset and are skipped if
-you haven't downloaded it. To rebuild everything from scratch (several GB of disk space),
-follow [docs/reproduction.md](docs/reproduction.md).
+A public checkout runs **40 tests and skips four** that require retained local analytical
+outputs. All 44 run when those inputs are present. These checks exercise synthetic examples
+and saved artifacts; they do not refit the published full-data models.
+
+Exact reproduction of the headline numbers requires the original snapshot or matching
+derived inputs, which are not distributed here. Downloading today's public records creates
+a new snapshot and may produce different results. For a focused reviewer walkthrough and
+full rebuild instructions (several GB of disk space), see [docs/reproduction.md](docs/reproduction.md).
 
 ## Privacy
 

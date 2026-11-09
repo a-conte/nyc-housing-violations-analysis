@@ -43,6 +43,28 @@ Report renderers contain snapshot-specific interpretive prose; review narratives
 computed tables after any fresh-source rebuild. Historical verification records describe the
 published run and are not automatically renewed by a pipeline rerun.
 
+## Focused reviewer walkthrough
+
+Start with the saved [leads report](../reports/leads/README.md).
+After installing the locked dependencies, the following commands exercise the core behavior
+without downloading NYC records or requiring the local analytical database:
+
+```sh
+uv run python -m pytest tests/test_download.py tests/test_database.py tests/test_sql.py -q
+uv run python -m pytest tests/test_cohort.py tests/test_baseline_models.py tests/test_model_validation.py tests/test_leads.py -q
+```
+
+The first command checks extraction against simulated API responses, snapshot validation,
+and SQL behavior on small fixtures, including joins that must not multiply events and
+missing months that must not become zeros. The second checks cohort rules, synthetic model
+fits, pre-2025 selection guards, and deterministic lead queues. These are component tests,
+not an end-to-end reproduction of the published analysis or evidence of investigative accuracy.
+
+The full-suite command at the top also checks the saved report and provenance. Its four
+local-data tests reconcile the retained analytical outputs when those files are present.
+Manual verification of building identity, source records and practical lead usefulness is
+separate from these automated checks and has not been established by this project.
+
 ## Full rebuild from live sources
 
 This path downloads data and fits models; it is not needed to review the portfolio and was

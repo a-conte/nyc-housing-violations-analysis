@@ -28,3 +28,7 @@ htmlcov/
 *.swp
 *.swo
 *~
+
+# Local job-application materials
+/docs/code_sample_cover.md
+/output/pdf/code_sample_cover.pdf
