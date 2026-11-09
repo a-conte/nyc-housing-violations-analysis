@@ -1,0 +1,10 @@
+{
+  "generated_at": "2026-11-06T19:37:15.837798+00:00",
+  "code_sha256": "c7bb4676cec80220653a265bf85c816af3a24e8df1b4d7c395bf8d60b1b76854",
+  "report_code_sha256": "ebbf93aa43984c4a394883dccc5effed5f3ea3a7b6ee562708495dd72c763c88",
+  "plan_sha256": "dfe473ff2f6cb50111acdf93eb790e76c8cbad26691cd81558af8ff1c9553899",
+  "phase5_parameters_sha256": "16b085e0c895c94c2d7f11a3e17ccd8fdb8af2722800e93338f09790819262e2",
+  "phase5_predictions_sha256": "a36043aa27fbc02c8557e834eb1ab3d43fc6330a0a62ab210748cf90d1dd6eac",
+  "phase5_decision_sha256": "93245613e9452d1c2dec35f101351a751bd24285b40f40bbe8711d5b2b20afce",
+  "report_reviewed_at": "2026-11-09"
+}

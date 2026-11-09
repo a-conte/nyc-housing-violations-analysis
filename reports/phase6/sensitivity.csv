@@ -1,0 +1,5 @@
+scenario,base_leads,scenario_leads,retained,removed,added,jaccard
+exclude_ambiguous,27,27,23,4,4,0.7419354838709677
+comparable_HPD_vs_full,27,26,21,6,5,0.65625
+comparable_PLUTO_vs_HPD,26,26,25,1,1,0.9259259259259259
+agreement_only,27,23,16,11,7,0.47058823529411764

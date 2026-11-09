@@ -105,12 +105,14 @@ import duckdb
 
 with duckdb.connect("data/housing.duckdb", read_only=True) as con:
     print(con.sql("SELECT * FROM audit.checks ORDER BY severity, check_name"))
-    print(con.sql("""
+    print(
+        con.sql("""
         SELECT year, sum(complaints) AS complaints,
                sum(class_b) AS class_b, sum(class_c) AS class_c
         FROM mart.building_year
         GROUP BY year ORDER BY year
-    """))
+    """)
+    )
 ```
 
 `raw.*` preserves selected source values. `clean.*` holds typed records. `mart.*` contains
@@ -142,3 +144,13 @@ miscalibration remains; no investigative rankings or formal anomaly thresholds w
 2023/2024 rolling validation, then evaluates the frozen choice on 2025. Run
 `uv run python -m housing.phase5`. Mean calibration improves, but historical-activity
 heterogeneity and temporal drift still preclude formal anomaly thresholds.
+
+## Phase 6 investigative review
+
+[Phase 6 report and illustrative profiles](reports/phase6/README.md) identify 27 exploratory
+leads using separate raw-count, per-unit-rate and frozen-model residual queues. They account
+for 11,328 recorded 2025 B/C violations; 23 had B/C activity in every prior study year.
+These are record-review priorities, not statistically validated anomalies or findings of
+wrongdoing. Denominator and linkage sensitivities and calibration limitations are documented
+in the report. [Completion verification](reports/phase6/VERIFICATION.md) reconciles the saved
+outputs to DuckDB and records the checks. Phase 6 is complete; Phase 7 has not begun.

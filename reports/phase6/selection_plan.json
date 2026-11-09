@@ -1,0 +1,17 @@
+{
+  "year": 2025,
+  "minimum_apartments": 10,
+  "minimum_bc": 20,
+  "minimum_expected": 2,
+  "minimum_excess": 10,
+  "minimum_oe": 2,
+  "per_indicator_limit": 10,
+  "indicators": [
+    "hazardous",
+    "rate",
+    "pearson_residual"
+  ],
+  "tie_break": "numeric BuildingID ascending",
+  "peer_rule": "same borough, 0.5\u20132 times HPD units, exclude target; minimum 30",
+  "profiles": "highest raw count; highest rate among remaining leads; highest residual among remaining leads; highest raw count among remaining denominator/linkage-flagged leads"
+}

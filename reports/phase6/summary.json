@@ -1,0 +1,12 @@
+{
+  "cohort_buildings": 145832,
+  "cohort_bc": 571613,
+  "screen_eligible": 3934,
+  "leads": 27,
+  "lead_bc": 11328,
+  "lead_complaints": 4371,
+  "lead_problem_rows": 8516,
+  "leads_with_geography_flags": 0,
+  "leads_with_unit_disagreement": 5,
+  "leads_with_bc_all_prior_years": 23
+}
