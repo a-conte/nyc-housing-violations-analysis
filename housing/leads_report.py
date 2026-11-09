@@ -73,9 +73,9 @@ O/E and NB2 Pearson residual use unchanged Phase 5 expectations and dispersion.
 The model's 2025 aggregate O/E was 0.932, with 98.37% conditional 95% count-interval coverage and
 substantial historical-activity miscalibration (O/E 2.60 in the 20+ historical-activity
 stratum versus 0.15 in the zero-history stratum). The intervals condition on fitted
-parameters and do not capture parameter, linkage, exposure or reporting uncertainty. Neither residual cutoffs nor extreme O/E
-values have validated tail probabilities. No p-values, significance flags or wrongdoing
-claims are supplied.
+parameters and do not capture parameter, linkage, exposure or reporting uncertainty.
+Neither residual cutoffs nor extreme O/E values have validated tail probabilities.
+No p-values, significance flags or wrongdoing claims are supplied.
 
 ![Burden and illustrative histories](investigative_context.png)
 
@@ -140,9 +140,10 @@ confirmation. No direct complaint-to-violation causation is asserted.
 Lead-level flags include HPD/PLUTO units and comparison category, geographic conflicts
 (reported BBL, component BBL, BIN and internal BBL disagreements), number of active HPD
 records sharing the lot/BIN, and approval-before-inspection dates. All-period and 2025
-geographic conflict counts are separate and count problem/violation rows, not distinct complaints. Missing/invalid geographic values cannot always
-produce a conflict flag; no flagged-count-zero building is declared error-free. Source
-coverage is observed publication, not proof of complete reporting or historical occupancy.
+geographic conflict counts are separate and count problem/violation rows, not distinct
+complaints. Missing/invalid geographic values cannot always produce a conflict flag;
+no flagged-count-zero building is declared error-free. Source coverage is observed
+publication, not proof of complete reporting or historical occupancy.
 
 ## Selection sensitivity without changing the model
 
@@ -185,5 +186,6 @@ raw, rate and residual indicators; foreground robust and sensitive examples toge
 include cohort exclusions, zero-event definitions and review limitations; and distinguish
 administrative building identity from a verified physical property. Verify consequential
 source records and exposure before interpreting any individual lead. No owner attribution,
-validated accuracy claim or formal anomaly classification is warranted. Phase 6 is complete; Phase 7 is outside this review.
+validated accuracy claim or formal anomaly classification is warranted. Phase 6 is complete;
+Phase 7 is outside this review.
 """)

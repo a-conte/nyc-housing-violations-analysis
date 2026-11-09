@@ -26,7 +26,10 @@ PLAN = {
     ],
     "models": MODELS,
     "size_knots_apartments": [10, 50],
-    "selection": "minimum mean across folds of absolute log aggregate O/E plus mean absolute log O/E in three size bands; tie break by validation negative log likelihood",
+    "selection": (
+        "minimum mean across folds of absolute log aggregate O/E plus mean absolute log O/E "
+        "in three size bands; tie break by validation negative log likelihood"
+    ),
     "final_fit": [2021, 2022, 2023, 2024],
     "final_evaluation": 2025,
     "bootstrap_replicates": 300,

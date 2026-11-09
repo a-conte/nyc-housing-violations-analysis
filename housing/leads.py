@@ -28,7 +28,11 @@ PLAN = {
     "indicators": ["hazardous", "rate", "pearson_residual"],
     "tie_break": "numeric BuildingID ascending",
     "peer_rule": "same borough, 0.5–2 times HPD units, exclude target; minimum 30",
-    "profiles": "highest raw count; highest rate among remaining leads; highest residual among remaining leads; highest raw count among remaining denominator/linkage-flagged leads",
+    "profiles": (
+        "highest raw count; highest rate among remaining leads; "
+        "highest residual among remaining leads; "
+        "highest raw count among remaining denominator/linkage-flagged leads"
+    ),
 }
 
 

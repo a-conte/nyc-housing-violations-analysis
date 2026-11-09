@@ -1,29 +1,95 @@
-from pathlib import Path
+"""Write the Phase 3 cohort report. Run by `python -m housing.cohort` after the build."""
 
 import duckdb
 
-from housing.database import export_csv, markdown_table
+from housing.database import PROJECT, export_csv, markdown_table
 
-c = duckdb.connect("data/housing.duckdb", read_only=True)
-p = Path("reports/cohort")
-q = """WITH v AS (SELECT building_id,count(*) violations FROM clean.violations WHERE in_study GROUP BY 1), a AS (SELECT building_id,sum(complaints) complaints FROM mart.building_year GROUP BY 1)
-SELECT step,count(*) FILTER(WHERE eligibility_step>=step) retained_buildings,
-sum(complaints) FILTER(WHERE eligibility_step>=step) retained_complaints,
-100.0*sum(complaints) FILTER(WHERE eligibility_step>=step)/(SELECT count(DISTINCT complaint_id) FROM clean.complaints WHERE in_study) complaint_percent,
-sum(coalesce(violations,0)) FILTER(WHERE eligibility_step>=step) retained_violations,
-100.0*sum(coalesce(violations,0)) FILTER(WHERE eligibility_step>=step)/(SELECT count(*) FROM clean.violations WHERE in_study) violation_percent
-FROM analytical.eligibility LEFT JOIN a USING(building_id) LEFT JOIN v USING(building_id)
-CROSS JOIN range(1,9) r(step) GROUP BY step ORDER BY step"""
-export_csv(c, q, p / "rule_coverage.csv")
-cur = c.execute(q)
-table = markdown_table([d[0] for d in cur.description], cur.fetchall())
-q2 = """SELECT unit_comparison,count(*) buildings,median(unit_relative_difference) median_relative_difference,quantile_cont(unit_relative_difference,0.1) p10,quantile_cont(unit_relative_difference,0.9) p90 FROM mart.buildings WHERE candidate_multifamily GROUP BY 1 ORDER BY 1"""
-export_csv(c, q2, p / "unit_discrepancies.csv")
-q3 = """WITH d AS (SELECT event_month,violation_class,count(*) n,count(DISTINCT building_id) buildings,count(DISTINCT order_number) orders,max(day_count) largest_day_rows FROM (SELECT *,count(*) OVER(PARTITION BY event_month,violation_class,inspected_at::DATE) day_count FROM clean.violations WHERE in_study) GROUP BY 1,2)
-SELECT * FROM d WHERE event_month IN (SELECT event_month FROM audit.monthly_coverage WHERE source='violations' AND (year_over_year_ratio<0.5 OR year_over_year_ratio>2)) ORDER BY 1,2"""
-export_csv(c, q3, p / "shift_composition.csv")
-(p / "README.md").write_text(
-    """# Analytical cohort and SQL features (Phase 3)
+REPORT = PROJECT / "reports/cohort"
+
+# How many buildings, complaints and violations remain after each eligibility rule.
+RULE_COVERAGE = """
+WITH v AS (
+    SELECT building_id, count(*) AS violations
+    FROM clean.violations
+    WHERE in_study
+    GROUP BY 1
+), a AS (
+    SELECT building_id, sum(complaints) AS complaints
+    FROM mart.building_year
+    GROUP BY 1
+)
+SELECT step,
+       count(*) FILTER (WHERE eligibility_step >= step) AS retained_buildings,
+       sum(complaints) FILTER (WHERE eligibility_step >= step) AS retained_complaints,
+       100.0 * sum(complaints) FILTER (WHERE eligibility_step >= step)
+           / (SELECT count(DISTINCT complaint_id) FROM clean.complaints WHERE in_study)
+           AS complaint_percent,
+       sum(coalesce(violations, 0)) FILTER (WHERE eligibility_step >= step)
+           AS retained_violations,
+       100.0 * sum(coalesce(violations, 0)) FILTER (WHERE eligibility_step >= step)
+           / (SELECT count(*) FROM clean.violations WHERE in_study)
+           AS violation_percent
+FROM analytical.eligibility
+LEFT JOIN a USING (building_id)
+LEFT JOIN v USING (building_id)
+CROSS JOIN range(1, 9) r(step)
+GROUP BY step
+ORDER BY step
+"""
+
+# Spread of HPD-vs-PLUTO apartment-count differences, by comparison category.
+UNIT_DISCREPANCIES = """
+SELECT unit_comparison,
+       count(*) AS buildings,
+       median(unit_relative_difference) AS median_relative_difference,
+       quantile_cont(unit_relative_difference, 0.1) AS p10,
+       quantile_cont(unit_relative_difference, 0.9) AS p90
+FROM mart.buildings
+WHERE candidate_multifamily
+GROUP BY 1
+ORDER BY 1
+"""
+
+# What made up the months whose violation counts jumped or fell sharply year over year.
+SHIFT_COMPOSITION = """
+WITH d AS (
+    SELECT event_month,
+           violation_class,
+           count(*) AS n,
+           count(DISTINCT building_id) AS buildings,
+           count(DISTINCT order_number) AS orders,
+           max(day_count) AS largest_day_rows
+    FROM (
+        SELECT *,
+               count(*) OVER (
+                   PARTITION BY event_month, violation_class, inspected_at::DATE
+               ) AS day_count
+        FROM clean.violations
+        WHERE in_study
+    )
+    GROUP BY 1, 2
+)
+SELECT *
+FROM d
+WHERE event_month IN (
+    SELECT event_month
+    FROM audit.monthly_coverage
+    WHERE source = 'violations'
+      AND (year_over_year_ratio < 0.5 OR year_over_year_ratio > 2)
+)
+ORDER BY 1, 2
+"""
+
+
+def main() -> None:
+    with duckdb.connect(str(PROJECT / "data/housing.duckdb"), read_only=True) as connection:
+        export_csv(connection, RULE_COVERAGE, REPORT / "rule_coverage.csv")
+        cursor = connection.execute(RULE_COVERAGE)
+        table = markdown_table([column[0] for column in cursor.description], cursor.fetchall())
+        export_csv(connection, UNIT_DISCREPANCIES, REPORT / "unit_discrepancies.csv")
+        export_csv(connection, SHIFT_COMPOSITION, REPORT / "shift_composition.csv")
+    (REPORT / "README.md").write_text(
+        """# Analytical cohort and SQL features (Phase 3)
 
 Completed using the existing frozen inputs; no models or new source downloads.
 Reproduce with `python -m housing.cohort` after Phase 2. SQL lives in
@@ -49,16 +115,20 @@ Rules are ordered; exclusions are mutually exclusive. Step 1 is the full HPD inv
 step 2 has passed identifier validation, and step 8 has passed every rule:
 
 1. Valid BuildingID, BBL and BIN.
-2. Current active building, at least three HPD apartments, zero Class B rooms, known non-NYCHA management.
+2. Current active building, at least three HPD apartments, zero Class B rooms, known
+   non-NYCHA management.
 3. PLUTO match with positive residential units and residential area, corroborating residential use.
 4. No BIN shared by multiple active HPD records. Shared lots are retained with HPD denominators.
-5. Known construction year strictly before the study start; never use event occurrence as eligibility evidence.
-6. No recorded alteration year at or after study start (a conservative history sensitivity restriction).
-7. Both event sources present in every study month. A missing month blocks the cohort rather than creating zeros.
+5. Known construction year strictly before the study start; never use event occurrence as
+   eligibility evidence.
+6. No recorded alteration year at or after study start (a conservative history sensitivity
+   restriction).
+7. Both event sources present in every study month. A missing month blocks the cohort rather
+   than creating zeros.
 
 """
-    + table
-    + """
+        + table
+        + """
 
 The final cohort contains **145,832 buildings**, **1,961,330 complaints**, **1,445,019 B**
 and **1,089,687 C** violations. **75,106 buildings** have no recorded complaints or B/C
@@ -81,7 +151,8 @@ this is compatible with administrative batches as well as changes in recorded ac
 is not evidence of a cause. shift_composition.csv adds distinct buildings, order-code diversity
 and peak inspection-day counts for each flagged month/class. Compare with
 ../data_quality/monthly_change_review.csv; no months are deleted, adjusted or imputed.
-400 approval dates precede inspection; inspection remains the event date. Date sensitivity remains necessary.
+400 approval dates precede inspection; inspection remains the event date. Date sensitivity
+remains necessary.
 
 ## Feature contract and readiness
 
@@ -93,9 +164,9 @@ Persistence means recorded activity, not statistically elevated activity. Zero m
 record within observed source months. No observed events are required for inclusion.
 
 Capacity-unit-years use current HPD units multiplied by complete calendar years. Pre-study
-construction and absence of recorded alterations do **not** prove stable units, continuous occupancy,
-or historical eligibility. The estimand is historical recorded activity in the current inventory
-with conservative history screens, not historical NYC rental housing as a whole.
+construction and absence of recorded alterations do **not** prove stable units, continuous
+occupancy, or historical eligibility. The estimand is historical recorded activity in the current
+inventory with conservative history screens, not historical NYC rental housing as a whole.
 The mixed November 2/5 extraction dates and mutable statuses remain limitations.
 
 Ready for conditional descriptive modeling, not causal or misconduct conclusions. Phase 4 should
@@ -105,4 +176,8 @@ baseline and overdispersion diagnostics. Reserve 2025 only after specifying the 
 the five-year total/persistence fields include 2025 and must never be training predictors for it.
 Use annual rows through 2024 to construct training-only features. No Phase 4 work was performed.
 """
-)
+    )
+
+
+if __name__ == "__main__":
+    main()

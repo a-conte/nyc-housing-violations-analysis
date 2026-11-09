@@ -24,12 +24,16 @@ Rules are ordered; exclusions are mutually exclusive. Step 1 is the full HPD inv
 step 2 has passed identifier validation, and step 8 has passed every rule:
 
 1. Valid BuildingID, BBL and BIN.
-2. Current active building, at least three HPD apartments, zero Class B rooms, known non-NYCHA management.
+2. Current active building, at least three HPD apartments, zero Class B rooms, known
+   non-NYCHA management.
 3. PLUTO match with positive residential units and residential area, corroborating residential use.
 4. No BIN shared by multiple active HPD records. Shared lots are retained with HPD denominators.
-5. Known construction year strictly before the study start; never use event occurrence as eligibility evidence.
-6. No recorded alteration year at or after study start (a conservative history sensitivity restriction).
-7. Both event sources present in every study month. A missing month blocks the cohort rather than creating zeros.
+5. Known construction year strictly before the study start; never use event occurrence as
+   eligibility evidence.
+6. No recorded alteration year at or after study start (a conservative history sensitivity
+   restriction).
+7. Both event sources present in every study month. A missing month blocks the cohort rather
+   than creating zeros.
 
 | step | retained_buildings | retained_complaints | complaint_percent | retained_violations | violation_percent |
 | --- | --- | --- | --- | --- | --- |
@@ -63,7 +67,8 @@ this is compatible with administrative batches as well as changes in recorded ac
 is not evidence of a cause. shift_composition.csv adds distinct buildings, order-code diversity
 and peak inspection-day counts for each flagged month/class. Compare with
 ../data_quality/monthly_change_review.csv; no months are deleted, adjusted or imputed.
-400 approval dates precede inspection; inspection remains the event date. Date sensitivity remains necessary.
+400 approval dates precede inspection; inspection remains the event date. Date sensitivity
+remains necessary.
 
 ## Feature contract and readiness
 
@@ -75,9 +80,9 @@ Persistence means recorded activity, not statistically elevated activity. Zero m
 record within observed source months. No observed events are required for inclusion.
 
 Capacity-unit-years use current HPD units multiplied by complete calendar years. Pre-study
-construction and absence of recorded alterations do **not** prove stable units, continuous occupancy,
-or historical eligibility. The estimand is historical recorded activity in the current inventory
-with conservative history screens, not historical NYC rental housing as a whole.
+construction and absence of recorded alterations do **not** prove stable units, continuous
+occupancy, or historical eligibility. The estimand is historical recorded activity in the current
+inventory with conservative history screens, not historical NYC rental housing as a whole.
 The mixed November 2/5 extraction dates and mutable statuses remain limitations.
 
 Ready for conditional descriptive modeling, not causal or misconduct conclusions. Phase 4 should

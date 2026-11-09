@@ -3,7 +3,8 @@ from housing.cohort import build
 
 def prepare(con):
     con.execute(
-        "UPDATE mart.buildings SET residential_area=100, year_built=1900, year_altered_1=0, year_altered_2=0"
+        "UPDATE mart.buildings "
+        "SET residential_area=100, year_built=1900, year_altered_1=0, year_altered_2=0"
     )
 
 
@@ -11,7 +12,9 @@ def test_cohort_denominators_zeros_and_reproducibility(audit_db):
     prepare(audit_db)
     build(audit_db)
     rows = audit_db.execute(
-        "SELECT building_id,selected_units,complaints,class_b,class_c FROM analytical.features ORDER BY building_id"
+        "SELECT building_id,selected_units,complaints,class_b,class_c "
+        "FROM analytical.features "
+        "ORDER BY building_id"
     ).fetchall()
     assert ("1", 10, 2, 2, 1) in rows
     assert ("2", 8, 1, 0, 0) in rows  # HPD/PLUTO disagreement retained, no imputation.
@@ -23,7 +26,9 @@ def test_cohort_denominators_zeros_and_reproducibility(audit_db):
     build(audit_db)
     assert (
         audit_db.execute(
-            "SELECT building_id,selected_units,complaints,class_b,class_c FROM analytical.features ORDER BY building_id"
+            "SELECT building_id,selected_units,complaints,class_b,class_c "
+            "FROM analytical.features "
+            "ORDER BY building_id"
         ).fetchall()
         == rows
     )

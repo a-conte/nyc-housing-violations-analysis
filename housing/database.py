@@ -176,21 +176,39 @@ def write_reports(
         "checks": "SELECT * FROM audit.checks ORDER BY severity, check_name",
         "monthly_coverage": "SELECT * FROM audit.monthly_coverage ORDER BY source, event_month",
         "linkage_summary": "SELECT * FROM audit.linkage_summary ORDER BY source, year",
-        "unit_comparison": "SELECT * FROM audit.unit_comparison ORDER BY borough_id, candidate_multifamily, unit_comparison",
+        "unit_comparison": (
+            "SELECT * FROM audit.unit_comparison "
+            "ORDER BY borough_id, candidate_multifamily, unit_comparison"
+        ),
         "violation_classes": "SELECT * FROM audit.violation_classes ORDER BY year, violation_class",
         "date_quality": "SELECT * FROM audit.date_quality ORDER BY source, extract_partition",
         "cohort_summary": "SELECT * FROM audit.cohort_summary ORDER BY buildings DESC",
-        "snapshot_verification": "SELECT * FROM audit.snapshot_verification ORDER BY source, partition",
-        "identifier_quality": "SELECT * FROM audit.identifier_quality ORDER BY source, extract_partition",
+        "snapshot_verification": (
+            "SELECT * FROM audit.snapshot_verification ORDER BY source, partition"
+        ),
+        "identifier_quality": (
+            "SELECT * FROM audit.identifier_quality ORDER BY source, extract_partition"
+        ),
         "building_linkage": "SELECT * FROM audit.building_linkage ORDER BY borough_id",
         "key_cardinality": "SELECT * FROM audit.key_cardinality ORDER BY key_type",
         "cohort_exclusions": "SELECT * FROM audit.cohort_exclusions ORDER BY cohort_reason",
-        "denominator_selection": "SELECT * FROM audit.denominator_selection ORDER BY borough_id, apartment_band",
-        "cohort_property_types": "SELECT * FROM audit.cohort_property_types ORDER BY candidate_buildings DESC, building_class, pluto_building_class, land_use, management_program",
+        "denominator_selection": (
+            "SELECT * FROM audit.denominator_selection ORDER BY borough_id, apartment_band"
+        ),
+        "cohort_property_types": (
+            "SELECT * FROM audit.cohort_property_types ORDER BY candidate_buildings DESC, "
+            "building_class, pluto_building_class, land_use, management_program"
+        ),
         "outcome_selection": "SELECT * FROM audit.outcome_selection ORDER BY year, cohort",
-        "construction_exposure": "SELECT * FROM audit.construction_exposure ORDER BY candidate_multifamily",
-        "complaint_categories": "SELECT * FROM audit.complaint_categories ORDER BY year, major_category",
-        "violation_date_comparison": "SELECT * FROM audit.violation_date_comparison ORDER BY extract_partition",
+        "construction_exposure": (
+            "SELECT * FROM audit.construction_exposure ORDER BY candidate_multifamily"
+        ),
+        "complaint_categories": (
+            "SELECT * FROM audit.complaint_categories ORDER BY year, major_category"
+        ),
+        "violation_date_comparison": (
+            "SELECT * FROM audit.violation_date_comparison ORDER BY extract_partition"
+        ),
         "row_reconciliation": "SELECT * FROM audit.row_reconciliation ORDER BY source",
     }
     for name, query in exports.items():
@@ -255,6 +273,25 @@ def write_reports(
     """).fetchall()
     errors = [row for row in checks if row[1] == "error"]
     start, end = config["study"]["start_year"], config["study"]["end_year"]
+    monthly_table = markdown_table(
+        [
+            "Source",
+            "Months",
+            "Months without records",
+            "Minimum monthly rows",
+            "Maximum monthly rows",
+        ],
+        monthly,
+    )
+    links_table = markdown_table(
+        ["Source", "Study rows", "No HPD building match", "BBL conflicts", "BIN conflicts"],
+        links,
+    )
+    checks_table = (
+        markdown_table(["Check", "Severity", "Rows or groups"], checks)
+        if checks
+        else "No automated checks flagged records."
+    )
     body = f"""# Extraction, validation and linkage audit (Phase 2)
 
 Generated from the local frozen extracts completed at **{run["completed_at"]}**.
@@ -281,7 +318,7 @@ for raw-to-clean, monthly-aggregate, and matched-panel conservation checks.
 
 ## Coverage
 
-{markdown_table(["Source", "Months", "Months without records", "Minimum monthly rows", "Maximum monthly rows"], monthly)}
+{monthly_table}
 
 {markdown_table(["Year", "Problem rows", "Distinct complaints"], annual)}
 
@@ -292,7 +329,7 @@ Undated events are retained for audit only and excluded from all dated outcomes.
 
 ## Event linkage
 
-{markdown_table(["Source", "Study rows", "No HPD building match", "BBL conflicts", "BIN conflicts"], links)}
+{links_table}
 
 Linkage uses HPD BuildingID; BBL/BIN disagreements are flags, not automatic rematches.
 Unmatched events remain in clean tables and audit views. The building panel contains only
@@ -333,7 +370,7 @@ year and permits missing construction years. Those assumptions require review be
 
 ## Checks requiring attention
 
-{markdown_table(["Check", "Severity", "Rows or groups"], checks) if checks else "No automated checks flagged records."}
+{checks_table}
 
 See [checks.csv](checks.csv), [date_quality.csv](date_quality.csv), and
 [violation_classes.csv](violation_classes.csv). Warnings remain visible; they are not assertions

@@ -1,5 +1,7 @@
 # NYC Housing Anomaly Analysis
 
+[![CI](https://github.com/a-conte/nyc-housing-anomaly-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/a-conte/nyc-housing-anomaly-analysis/actions/workflows/ci.yml)
+
 **Which New York City apartment buildings have far more serious housing violations than
 similar buildings, and should get a closer look?**
 
@@ -119,6 +121,56 @@ more than size and age alone can capture.
 
 Before anyone acted on these results, each building's records and identity would need to be
 checked by hand. This analysis does not show wrongdoing, ongoing defects or what caused them.
+
+## Future work
+
+- **Account for inspection effort.** Find a measure of how often each building was
+  inspected, so the model can tell bad conditions apart from frequent inspections.
+- **Use each building's history.** The model underpredicts buildings with a long record of
+  violations. Adding past violations as a predictor, using training years only, should
+  improve the predictions.
+- **Look at owners, carefully.** HPD's public building registrations list owners and
+  managing agents. Grouping buildings that share them could reveal patterns across a whole
+  portfolio, but it would need careful record matching and manual checks before any name
+  was attached to a finding.
+- **Test other dates.** Rerun with each violation's approval date instead of its inspection
+  date, since 400 violations have an approval date before their inspection date.
+- **Refresh regularly.** Re-download the data on a schedule and track how the list of
+  flagged buildings changes over time.
+
+## Technical summary
+
+**ETL (Python + DuckDB SQL)**
+
+- Extracts from the Socrata API with keyset pagination by primary key, so pages can't
+  shift while the live data changes. Retries with backoff, and shrinks the page size
+  after a timeout.
+- Downloads in partitions that can resume after an interruption. Each partition is
+  reconciled against the source row count before and after the download, and recorded
+  in a manifest with a SHA-256 checksum.
+- Before loading, verifies each file against its manifest: checksum, size, header and
+  readable gzip data.
+- Loads every column as text, then casts types explicitly in SQL so identifiers are
+  never misread as decimals.
+- Builds the database in a temporary file and replaces the real one only if all 17
+  blocking integrity checks pass. These include unique IDs, joins that never duplicate
+  events, and event totals that match from raw tables through to the final panel.
+- Links records across BuildingID, BBL and BIN with conflict flags instead of silently
+  dropping mismatches.
+
+**Analysis (Python: statsmodels, SciPy)**
+
+- Building-year panel with log(apartments) as the exposure offset. Controls for size,
+  age, borough and year trend.
+- Poisson baseline, replaced by negative binomial (NB2) after the training data showed
+  overdispersion (Pearson dispersion 33.37).
+- Model chosen by rolling validation (2021–22 → 2023, 2021–23 → 2024). The winner adds
+  piecewise size terms with knots at 10 and 50 apartments. It is refit on 2021–2024 and
+  evaluated once on 2025.
+- Diagnostics: calibration by size, borough and history; 95% count-interval coverage;
+  and a 300-replicate bootstrap that resamples tax lots.
+- Leads come from three separate top-10 lists (count, rate, Pearson residual) instead
+  of a composite score. Sensitivity checks cover ID linkage and the apartment-count source.
 
 ## Guide to the code
 
