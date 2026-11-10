@@ -1,4 +1,4 @@
-# NYC Housing Anomaly Analysis
+# NYC Housing Violations Analysis
 
 [![CI](https://github.com/a-conte/nyc-housing-violations-analysis/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/a-conte/nyc-housing-violations-analysis/actions/workflows/ci.yml)
 
